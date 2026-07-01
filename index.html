@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenCode Session Viewer</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-tertiary: #21262d;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --text-secondary: #8b949e;
+    --text-muted: #6e7681;
+    --accent: #58a6ff;
+    --accent-hover: #79c0ff;
+    --green: #3fb950;
+    --orange: #d2991d;
+    --red: #f85149;
+    --purple: #a371f7;
+    --radius: 8px;
+    --transition: 0.2s ease;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+  .header-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .header h1 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .header h1 .icon { font-size: 1.4rem; }
+  .header-stats {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+  .header-stats span { color: var(--accent); font-weight: 600; }
+
+  /* ── Layout ── */
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+
+  /* ── Controls ── */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .controls label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+  select, button {
+    background: var(--bg-tertiary);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: var(--transition);
+    font-family: inherit;
+  }
+  select:hover, button:hover {
+    border-color: var(--accent);
+    background: var(--bg-secondary);
+  }
+  button:active { transform: scale(0.97); }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+    font-weight: 500;
+  }
+  .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+  /* ── Loading ── */
+  .loading {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+  }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Error ── */
+  .error {
+    background: rgba(248,81,73,0.1);
+    border: 1px solid var(--red);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    color: var(--red);
+    margin-bottom: 20px;
+  }
+
+  /* ── Session Card ── */
+  .session-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    overflow: hidden;
+    transition: var(--transition);
+  }
+  .session-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px rgba(88,166,255,0.15);
+  }
+
+  .session-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 16px 20px;
+    cursor: pointer;
+    user-select: none;
+    gap: 16px;
+  }
+  .session-header:hover { background: rgba(255,255,255,0.02); }
+
+  .session-main { flex: 1; min-width: 0; }
+  .session-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+    word-break: break-word;
+  }
+  .session-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+  .session-meta span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+  }
+  .session-meta .dir {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .badge-agent { color: var(--purple); border-color: rgba(163,113,247,0.3); background: rgba(163,113,247,0.08); }
+  .badge-model { color: var(--accent); border-color: rgba(88,166,255,0.3); background: rgba(88,166,255,0.08); }
+  .badge-cost { color: var(--orange); border-color: rgba(210,153,29,0.3); background: rgba(210,153,29,0.08); }
+  .badge-tokens { color: var(--green); border-color: rgba(63,185,80,0.3); background: rgba(63,185,80,0.08); }
+
+  .session-toggle {
+    font-size: 1.2rem;
+    color: var(--text-muted);
+    transition: var(--transition);
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .session-card.open .session-toggle { transform: rotate(180deg); color: var(--accent); }
+
+  /* ── Session Body (expandable) ── */
+  .session-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    padding: 16px 20px;
+    background: var(--bg);
+  }
+  .session-card.open .session-body { display: block; }
+
+  .session-body h4 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* ── User Messages List ── */
+  .msg-list { list-style: none; }
+  .msg-item {
+    padding: 10px 14px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+    color: var(--text);
+    word-break: break-word;
+    line-height: 1.5;
+  }
+  .msg-item .msg-time {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+  .msg-item .msg-agent {
+    font-size: 0.72rem;
+    color: var(--purple);
+    margin-bottom: 2px;
+  }
+  .no-msgs {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-style: italic;
+  }
+
+  /* ── Pagination ── */
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 24px;
+    flex-wrap: wrap;
+  }
+  .pagination button {
+    min-width: 38px;
+    text-align: center;
+    padding: 8px 12px;
+  }
+  .pagination button.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .pagination button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  .pagination .ellipsis {
+    color: var(--text-muted);
+    padding: 0 4px;
+  }
+  .pagination-info {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-left: 8px;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    border-top: 1px solid var(--border);
+    margin-top: 40px;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .container { padding: 12px; }
+    .header { padding: 12px 16px; }
+    .session-header { padding: 12px 16px; }
+    .session-meta { gap: 4px 10px; }
+    .session-meta .dir { max-width: 180px; }
+    .controls { gap: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <h1><span class="icon">📋</span> OpenCode Session Viewer</h1>
+    <div class="header-stats" id="headerStats">加载中...</div>
+  </div>
+</div>
+
+<div class="container">
+  <!-- Controls -->
+  <div class="controls">
+    <label for="pageSize">每页显示：</label>
+    <select id="pageSize" onchange="changePageSize()">
+      <option value="10">10 条</option>
+      <option value="20" selected>20 条</option>
+      <option value="50">50 条</option>
+    </select>
+    <label for="sortOrder">排序：</label>
+    <select id="sortOrder" onchange="changeSort()">
+      <option value="desc" selected>最新在前</option>
+      <option value="asc">最早在前</option>
+    </select>
+    <button onclick="refreshSessions()" title="刷新">🔄 刷新</button>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <div>正在加载会话数据...</div>
+  </div>
+
+  <!-- Error -->
+  <div class="error" id="error" style="display:none;"></div>
+
+  <!-- Session List -->
+  <div id="sessionList"></div>
+
+  <!-- Pagination -->
+  <div class="pagination" id="pagination"></div>
+
+  <div class="footer">
+    OpenCode Session Viewer · 数据来源: opencode.db
+  </div>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────
+const state = {
+  page: 1,
+  limit: 20,
+  sort: 'desc',
+  total: 0,
+  totalPages: 0,
+  sessions: [],
+  expandedSessions: new Set(),
+  sessionMessages: {},  // cache: sessionId -> messages[]
+};
+
+// ─── API ─────────────────────────────────────────────────────
+async function api(path) {
+  const res = await fetch(path);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error(err.error || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+async function loadSessions() {
+  const loading = document.getElementById('loading');
+  const error = document.getElementById('error');
+  loading.style.display = 'block';
+  error.style.display = 'none';
+  document.getElementById('sessionList').innerHTML = '';
+
+  try {
+    const data = await api(`/api/sessions?page=${state.page}&limit=${state.limit}&sort=${state.sort}`);
+    state.sessions = data.sessions;
+    state.total = data.total;
+    state.totalPages = data.total_pages;
+    state.expandedSessions.clear();
+    state.sessionMessages = {};
+
+    document.getElementById('headerStats').innerHTML =
+      `共 <span>${data.total}</span> 个会话，第 <span>${data.page}</span> / <span>${data.total_pages}</span> 页`;
+
+    renderSessions();
+    renderPagination();
+  } catch (e) {
+    error.textContent = '加载失败: ' + e.message;
+    error.style.display = 'block';
+  } finally {
+    loading.style.display = 'none';
+  }
+}
+
+// ─── Render ──────────────────────────────────────────────────
+function formatTime(ms) {
+  if (!ms) return '-';
+  const d = new Date(ms);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function formatCost(c) {
+  if (c == null || c === 0) return null;
+  return '$' + Number(c).toFixed(4);
+}
+
+function formatTokens(input, output) {
+  const parts = [];
+  if (input) parts.push(`入:${(input/1000).toFixed(1)}k`);
+  if (output) parts.push(`出:${(output/1000).toFixed(1)}k`);
+  return parts.join(' ');
+}
+
+function truncatePath(p, maxLen) {
+  if (!p) return '-';
+  if (p.length <= maxLen) return escapeHtml(p);
+  return escapeHtml(p.substring(0, maxLen)) + '...';
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function renderSessions() {
+  const list = document.getElementById('sessionList');
+  if (state.sessions.length === 0) {
+    list.innerHTML = '<div class="loading">没有找到会话记录</div>';
+    return;
+  }
+
+  list.innerHTML = state.sessions.map((s, i) => {
+    const isOpen = state.expandedSessions.has(s.id);
+    const cost = formatCost(s.cost);
+    const tokens = formatTokens(s.tokens_input, s.tokens_output);
+    const time = formatTime(s.time_created);
+    const updated = formatTime(s.time_updated);
+    const dir = s.directory || s.path || '-';
+    const modelName = s.model ? (s.model.variant || s.model.id || s.model.providerID || '') : '';
+    const agentName = s.agent || '';
+    const userMsgCount = s.user_message_count || 0;
+
+    let badges = '';
+    if (agentName) badges += `<span class="badge badge-agent">🤖 ${escapeHtml(agentName)}</span>`;
+    if (modelName) badges += `<span class="badge badge-model">🧠 ${escapeHtml(modelName)}</span>`;
+    if (cost) badges += `<span class="badge badge-cost">💰 ${cost}</span>`;
+    if (tokens) badges += `<span class="badge badge-tokens">📊 ${tokens}</span>`;
+
+    return `
+      <div class="session-card ${isOpen ? 'open' : ''}" id="card-${i}">
+        <div class="session-header" onclick="toggleSession('${s.id}', ${i})">
+          <div class="session-main">
+            <div class="session-title">${escapeHtml(s.title)}</div>
+            <div class="session-meta">
+              <span title="${escapeHtml(s.directory || '')}">📁 <span class="dir">${escapeHtml(dir)}</span></span>
+              <span>🕐 创建: ${time}</span>
+              ${updated !== time ? `<span>🔄 更新: ${updated}</span>` : ''}
+              <span>💬 用户输入: ${userMsgCount}</span>
+            </div>
+            <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;">${badges}</div>
+          </div>
+          <span class="session-toggle">▼</span>
+        </div>
+        <div class="session-body" id="body-${i}">
+          <h4>📝 最近 ${Math.min(10, userMsgCount)} 次用户输入</h4>
+          <div id="msgs-${i}">
+            <div class="loading" style="padding:20px;"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderPagination() {
+  const pag = document.getElementById('pagination');
+  if (state.totalPages <= 1) {
+    pag.innerHTML = '';
+    return;
+  }
+
+  const pages = [];
+  const tp = state.totalPages;
+  const cp = state.page;
+
+  // Build page numbers with ellipsis
+  if (tp <= 7) {
+    for (let i = 1; i <= tp; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    if (cp > 3) pages.push('...');
+    for (let i = Math.max(2, cp - 1); i <= Math.min(tp - 1, cp + 1); i++) {
+      pages.push(i);
+    }
+    if (cp < tp - 2) pages.push('...');
+    pages.push(tp);
+  }
+
+  let html = '';
+  html += `<button ${cp === 1 ? 'disabled' : ''} onclick="goPage(${cp - 1})">◀ 上一页</button>`;
+
+  for (const p of pages) {
+    if (p === '...') {
+      html += `<span class="ellipsis">...</span>`;
+    } else {
+      html += `<button class="${p === cp ? 'active' : ''}" onclick="goPage(${p})">${p}</button>`;
+    }
+  }
+
+  html += `<button ${cp === tp ? 'disabled' : ''} onclick="goPage(${cp + 1})">下一页 ▶</button>`;
+  html += `<span class="pagination-info">共 ${tp} 页</span>`;
+
+  pag.innerHTML = html;
+}
+
+// ─── Actions ─────────────────────────────────────────────────
+async function toggleSession(sessionId, index) {
+  const isOpen = state.expandedSessions.has(sessionId);
+
+  if (isOpen) {
+    state.expandedSessions.delete(sessionId);
+    document.getElementById(`card-${index}`).classList.remove('open');
+    return;
+  }
+
+  state.expandedSessions.add(sessionId);
+  document.getElementById(`card-${index}`).classList.add('open');
+
+  // Load messages if not cached
+  if (!state.sessionMessages[sessionId]) {
+    const msgsDiv = document.getElementById(`msgs-${index}`);
+    try {
+      const data = await api(`/api/sessions/${sessionId}/messages?limit=10`);
+      state.sessionMessages[sessionId] = data.messages;
+      renderMessages(index, data.messages);
+    } catch (e) {
+      msgsDiv.innerHTML = `<div class="error">加载失败: ${escapeHtml(e.message)}</div>`;
+    }
+  } else {
+    renderMessages(index, state.sessionMessages[sessionId]);
+  }
+}
+
+function renderMessages(index, messages) {
+  const div = document.getElementById(`msgs-${index}`);
+  if (!messages || messages.length === 0) {
+    div.innerHTML = '<div class="no-msgs">该会话暂无用户输入记录</div>';
+    return;
+  }
+
+  div.innerHTML = `<ul class="msg-list">${messages.map((m, mi) => `
+    <li class="msg-item">
+      <div class="msg-time">#${messages.length - mi} · ${formatTime(m.time_created)}</div>
+      ${m.agent ? `<div class="msg-agent">🤖 Agent: ${escapeHtml(m.agent)}</div>` : ''}
+      <div>${escapeHtml(m.text || '(空输入)')}</div>
+    </li>
+  `).join('')}</ul>`;
+}
+
+function goPage(p) {
+  if (p < 1 || p > state.totalPages || p === state.page) return;
+  state.page = p;
+  loadSessions();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function changePageSize() {
+  state.limit = parseInt(document.getElementById('pageSize').value);
+  state.page = 1;
+  loadSessions();
+}
+
+function changeSort() {
+  state.sort = document.getElementById('sortOrder').value;
+  state.page = 1;
+  loadSessions();
+}
+
+function refreshSessions() {
+  state.expandedSessions.clear();
+  state.sessionMessages = {};
+  loadSessions();
+}
+
+// ─── Keyboard shortcuts ──────────────────────────────────────
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowLeft' && !e.target.closest('input,select,textarea')) {
+    goPage(state.page - 1);
+  } else if (e.key === 'ArrowRight' && !e.target.closest('input,select,textarea')) {
+    goPage(state.page + 1);
+  }
+});
+
+// ─── Init ────────────────────────────────────────────────────
+loadSessions();
+</script>
+</body>
+</html>
