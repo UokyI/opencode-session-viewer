@@ -214,6 +214,50 @@
   }
   .session-card.open .session-toggle { transform: rotate(180deg); color: var(--accent); }
 
+  /* ── Copy Button ── */
+  .copy-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    cursor: pointer;
+    transition: var(--transition);
+    font-family: inherit;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  .copy-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(88,166,255,0.08);
+  }
+  .copy-btn:active { transform: scale(0.95); }
+  .copy-btn.copied {
+    border-color: var(--green);
+    color: var(--green);
+    background: rgba(63,185,80,0.1);
+  }
+  .session-id-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+  }
+  .session-id-row .sid {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 340px;
+  }
+
   /* ── Session Body (expandable) ── */
   .session-body {
     display: none;
@@ -475,6 +519,10 @@ function renderSessions() {
       <div class="session-card ${isOpen ? 'open' : ''}" id="card-${i}">
         <div class="session-header" onclick="toggleSession('${s.id}', ${i})">
           <div class="session-main">
+            <div class="session-id-row">
+              <span class="sid" title="${escapeHtml(s.id)}">${escapeHtml(s.id)}</span>
+              <button class="copy-btn" onclick="event.stopPropagation(); copySessionId('${escapeHtml(s.id)}', this)" title="复制 Session ID">📋 复制</button>
+            </div>
             <div class="session-title">${escapeHtml(s.title)}</div>
             <div class="session-meta">
               <span title="${escapeHtml(s.directory || '')}">📁 <span class="dir">${escapeHtml(dir)}</span></span>
@@ -535,6 +583,35 @@ function renderPagination() {
   html += `<span class="pagination-info">共 ${tp} 页</span>`;
 
   pag.innerHTML = html;
+}
+
+// ─── Copy ────────────────────────────────────────────────────
+function copySessionId(sessionId, btn) {
+  navigator.clipboard.writeText(sessionId).then(() => {
+    const orig = btn.innerHTML;
+    btn.innerHTML = '✅ 已复制';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.innerHTML = orig;
+      btn.classList.remove('copied');
+    }, 1500);
+  }).catch(() => {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = sessionId;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    const orig = btn.innerHTML;
+    btn.innerHTML = '✅ 已复制';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.innerHTML = orig;
+      btn.classList.remove('copied');
+    }, 1500);
+  });
 }
 
 // ─── Actions ─────────────────────────────────────────────────
