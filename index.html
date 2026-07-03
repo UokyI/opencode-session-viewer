@@ -561,7 +561,7 @@ function buildTokenStats(s) {
     html += '<span class="token-divider"></span>';
     html += `<span class="token-item token-cache-hit">🎯 缓存命中 <span class="val">${formatNum(cacheHit)}</span></span>`;
     html += `<span class="token-item token-cache-miss">💾 缓存未命中 <span class="val">${formatNum(cacheMiss)}</span></span>`;
-    const ratio = total > 0 ? (cacheHit / total * 100).toFixed(2) : '0.00';
+    const ratio = (total > 0 || cacheHit > 0) ? (cacheHit / (cacheHit + input) * 100).toFixed(2) : '0.00';
     html += `<span class="token-ratio">命中率 <span class="val">${ratio}%</span></span>`;
   }
 
