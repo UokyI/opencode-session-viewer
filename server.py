@@ -48,11 +48,18 @@ def api_sessions(params):
     """GET /api/sessions?page=1&limit=10&sort=desc"""
     page = int(params.get("page", [1])[0])
     limit = int(params.get("limit", [10])[0])
-    sort = params.get("sort", ["desc"])[0]  # desc or asc
+    sort = params.get("sort", ["desc"])[0]
     limit = min(max(limit, 1), 100)  # clamp 1-100
     offset = (page - 1) * limit
 
-    order = "DESC" if sort == "desc" else "ASC"
+    # Map sort parameter to ORDER BY clause
+    sort_map = {
+        "desc":          "s.time_created DESC",
+        "asc":           "s.time_created ASC",
+        "user_msg_desc": "user_message_count DESC, s.time_created DESC",
+        "user_msg_asc":  "user_message_count ASC, s.time_created DESC",
+    }
+    order_clause = sort_map.get(sort, "s.time_created DESC")
 
     conn = get_db()
     try:
@@ -65,7 +72,7 @@ def api_sessions(params):
                    (SELECT COUNT(*) FROM message m WHERE m.session_id = s.id) as message_count,
                    (SELECT COUNT(*) FROM message m WHERE m.session_id = s.id AND json_extract(m.data, '$.role')='user') as user_message_count
             FROM session s
-            ORDER BY s.time_created {order}
+            ORDER BY {order_clause}
             LIMIT ? OFFSET ?
         """, (limit, offset)).fetchall()
 
