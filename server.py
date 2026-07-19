@@ -386,9 +386,14 @@ def main():
         print(f"Example: python server.py --db C:\\path\\to\\opencode.db")
         sys.exit(1)
 
-    print(f"📂 Database: {DB_PATH}")
-    print(f"🌐 Server:   http://localhost:{PORT}")
-    print(f"📋 Press Ctrl+C to stop")
+    url = f"http://localhost:{PORT}"
+    print(f"\n  📂 Database: {DB_PATH}")
+    print(f"  🌐 Server:   {url}")
+    print(f"  📋 Press Ctrl+C to stop\n")
+
+    # Auto-open browser
+    if not os.environ.get("OPENCODE_NO_BROWSER"):
+        threading.Thread(target=_open_browser, args=(url,), daemon=True).start()
 
     server = HTTPServer(("0.0.0.0", PORT), RequestHandler)
     try:
@@ -396,6 +401,17 @@ def main():
     except KeyboardInterrupt:
         print("\n👋 Server stopped.")
         server.shutdown()
+
+
+def _open_browser(url):
+    """Open the default web browser after a short delay."""
+    import time
+    time.sleep(0.8)
+    try:
+        import webbrowser
+        webbrowser.open(url)
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":
