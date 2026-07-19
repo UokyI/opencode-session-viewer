@@ -5,43 +5,72 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OpenCode Session Viewer</title>
 <style>
+  /* ── Design Tokens ──────────────────────────────────────────
+     Palette: Deep Slate × Warm Copper
+     A developer tool should feel precise, calm, and data-forward.
+     Slate-ink backgrounds evoke terminal depth without the harsh
+     green-on-black cliché. Copper/gold accents for actionable
+     elements, cool blue for neutral data, soft green for cache
+     efficiency signals.
+  ──────────────────────────────────────────────────────────── */
   :root {
-    --bg: #0d1117;
-    --bg-secondary: #161b22;
-    --bg-tertiary: #21262d;
-    --border: #30363d;
-    --text: #c9d1d9;
-    --text-secondary: #8b949e;
-    --text-muted: #6e7681;
-    --accent: #58a6ff;
-    --accent-hover: #79c0ff;
-    --green: #3fb950;
-    --orange: #d2991d;
-    --red: #f85149;
-    --purple: #a371f7;
-    --radius: 8px;
-    --transition: 0.2s ease;
+    --ink-900: #14181f;
+    --ink-800: #1a1f28;
+    --ink-700: #212733;
+    --ink-600: #2a3140;
+    --ink-500: #353d4f;
+    --ink-400: #4a5468;
+    --border: #2d3545;
+    --border-hover: #414c62;
+
+    --text: #d6deeb;
+    --text-secondary: #8895ad;
+    --text-muted: #596782;
+
+    --copper: #d4a853;
+    --copper-hover: #e2be6e;
+    --copper-dim: rgba(212,168,83,0.12);
+    --copper-border: rgba(212,168,83,0.25);
+
+    --blue: #61afef;
+    --blue-dim: rgba(97,175,239,0.12);
+
+    --cache-hit: #7ec98f;
+    --cache-hit-dim: rgba(126,201,143,0.1);
+    --cache-miss: #4a8c5d;
+
+    --cost: #e06c75;
+    --cost-dim: rgba(224,108,117,0.12);
+    --purple: #c678dd;
+    --purple-dim: rgba(198,120,221,0.1);
+
+    --radius: 6px;
+    --radius-lg: 10px;
+    --transition: 0.15s ease;
   }
+
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    background: var(--bg);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--ink-900);
     color: var(--text);
-    line-height: 1.6;
+    line-height: 1.55;
     min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
   }
 
   /* ── Header ── */
   .header {
-    background: var(--bg-secondary);
+    background: linear-gradient(180deg, var(--ink-800) 0%, var(--ink-900) 100%);
     border-bottom: 1px solid var(--border);
-    padding: 16px 24px;
+    padding: 14px 24px;
     position: sticky;
     top: 0;
     z-index: 100;
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(16px) saturate(120%);
   }
   .header-inner {
     max-width: 1200px;
@@ -52,129 +81,225 @@
     flex-wrap: wrap;
     gap: 12px;
   }
-  .header h1 {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--text);
+  .header-brand {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
   }
-  .header h1 .icon { font-size: 1.4rem; }
+  .header-logo {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--copper) 0%, #b8883a 100%);
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; color: #14181f; font-weight: 700;
+  }
+  .header h1 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
   .header-stats {
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     color: var(--text-secondary);
+    font-weight: 500;
   }
-  .header-stats span { color: var(--accent); font-weight: 600; }
+  .header-stats span { color: var(--copper); font-weight: 600; }
 
   /* ── Layout ── */
   .container {
-    max-width: 1200px;
+    max-width: 1120px;
     margin: 0 auto;
-    padding: 24px;
+    padding: 20px 24px 40px;
   }
 
   /* ── Controls ── */
   .controls {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 20px;
+    gap: 10px;
+    margin-bottom: 18px;
     flex-wrap: wrap;
+    padding: 12px 16px;
+    background: var(--ink-800);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
   }
   .controls label {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--text-secondary);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
   }
-  select, button {
-    background: var(--bg-tertiary);
+  .search-box {
+    flex: 1;
+    min-width: 180px;
+    max-width: 340px;
+    background: var(--ink-700);
     color: var(--text);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 8px 14px;
-    font-size: 0.85rem;
+    padding: 7px 12px 7px 32px;
+    font-size: 0.84rem;
+    font-family: inherit;
+    transition: var(--transition);
+    outline: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='%23596782'%3E%3Cpath d='M6.5 0a6.5 6.5 0 0 1 5.1 10.5l2.4 2.3-.7.7-2.3-2.4A6.5 6.5 0 1 1 6.5 0Zm0 1.5a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 10px center;
+  }
+  .search-box::placeholder { color: var(--text-muted); }
+  .search-box:focus {
+    border-color: var(--copper);
+    box-shadow: 0 0 0 3px var(--copper-dim);
+  }
+  select, button {
+    background: var(--ink-700);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 7px 12px;
+    font-size: 0.82rem;
     cursor: pointer;
     transition: var(--transition);
     font-family: inherit;
-  }
-  select:hover, button:hover {
-    border-color: var(--accent);
-    background: var(--bg-secondary);
-  }
-  button:active { transform: scale(0.97); }
-  .btn-primary {
-    background: var(--accent);
-    color: #fff;
-    border-color: var(--accent);
     font-weight: 500;
+    outline: none;
   }
-  .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  select:hover, button:hover { border-color: var(--border-hover); background: var(--ink-600); }
+  select:focus-visible, button:focus-visible {
+    border-color: var(--copper);
+    box-shadow: 0 0 0 2px var(--copper-dim);
+  }
+  .btn-primary {
+    background: var(--copper);
+    color: #14181f;
+    border-color: var(--copper);
+    font-weight: 600;
+  }
+  .btn-primary:hover { background: var(--copper-hover); border-color: var(--copper-hover); }
 
   /* ── Loading ── */
   .loading {
     text-align: center;
-    padding: 60px 20px;
+    padding: 64px 20px;
     color: var(--text-muted);
   }
   .spinner {
-    width: 36px; height: 36px;
-    border: 3px solid var(--border);
-    border-top-color: var(--accent);
+    width: 32px; height: 32px;
+    border: 2.5px solid var(--border);
+    border-top-color: var(--copper);
     border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin: 0 auto 16px;
+    animation: spin 0.7s linear infinite;
+    margin: 0 auto 14px;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
   /* ── Error ── */
   .error {
-    background: rgba(248,81,73,0.1);
-    border: 1px solid var(--red);
+    background: var(--cost-dim);
+    border: 1px solid rgba(224,108,117,0.35);
     border-radius: var(--radius);
-    padding: 16px 20px;
-    color: var(--red);
-    margin-bottom: 20px;
+    padding: 14px 18px;
+    color: var(--cost);
+    margin-bottom: 18px;
+    font-size: 0.85rem;
   }
 
   /* ── Session Card ── */
   .session-card {
-    background: var(--bg-secondary);
+    background: var(--ink-800);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    margin-bottom: 12px;
+    border-left: 3px solid transparent;
+    border-radius: var(--radius-lg);
+    margin-bottom: 10px;
     overflow: hidden;
-    transition: var(--transition);
+    transition: border-color var(--transition), box-shadow var(--transition);
   }
   .session-card:hover {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 1px rgba(88,166,255,0.15);
+    border-color: var(--border-hover);
+    border-left-color: var(--ink-400);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  }
+  .session-card.open {
+    border-left-color: var(--copper);
+    border-color: var(--copper-border);
   }
 
   .session-header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    padding: 16px 20px;
+    padding: 14px 18px;
     cursor: pointer;
     user-select: none;
-    gap: 16px;
+    gap: 14px;
   }
-  .session-header:hover { background: rgba(255,255,255,0.02); }
 
   .session-main { flex: 1; min-width: 0; }
   .session-title {
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 600;
     color: var(--text);
-    margin-bottom: 4px;
+    margin-bottom: 2px;
     word-break: break-word;
+    letter-spacing: -0.01em;
+    line-height: 1.35;
   }
+
+  /* Session ID row */
+  .session-id-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-bottom: 3px;
+    font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', 'Monaco', monospace;
+  }
+  .session-id-row .sid {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 340px;
+    color: var(--text-secondary);
+  }
+  .copy-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    cursor: pointer;
+    transition: var(--transition);
+    font-family: inherit;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  .copy-btn:hover {
+    border-color: var(--copper);
+    color: var(--copper);
+    background: var(--copper-dim);
+  }
+  .copy-btn.copied {
+    border-color: var(--cache-hit);
+    color: var(--cache-hit);
+    background: var(--cache-hit-dim);
+  }
+
+  /* Session meta */
   .session-meta {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px 16px;
-    font-size: 0.78rem;
+    gap: 6px 16px;
+    font-size: 0.76rem;
     color: var(--text-muted);
+    margin-top: 8px;
   }
   .session-meta span {
     display: flex;
@@ -183,177 +308,150 @@
     white-space: nowrap;
   }
   .session-meta .dir {
-    max-width: 300px;
+    max-width: 280px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
   .badge {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.72rem;
+    gap: 3px;
+    padding: 2px 9px;
+    border-radius: 10px;
+    font-size: 0.7rem;
     font-weight: 500;
-    background: var(--bg-tertiary);
+    background: transparent;
     border: 1px solid var(--border);
     white-space: nowrap;
+    letter-spacing: 0.01em;
   }
-  .badge-agent { color: var(--purple); border-color: rgba(163,113,247,0.3); background: rgba(163,113,247,0.08); }
-  .badge-model { color: var(--accent); border-color: rgba(88,166,255,0.3); background: rgba(88,166,255,0.08); }
-  .badge-cost { color: var(--orange); border-color: rgba(210,153,29,0.3); background: rgba(210,153,29,0.08); }
-  .badge-tokens { color: var(--green); border-color: rgba(63,185,80,0.3); background: rgba(63,185,80,0.08); }
+  .badge-agent { color: var(--purple); border-color: rgba(198,120,221,0.3); background: var(--purple-dim); }
+  .badge-model { color: var(--blue); border-color: rgba(97,175,239,0.25); background: var(--blue-dim); }
+  .badge-cost { color: var(--cost); border-color: rgba(224,108,117,0.25); background: var(--cost-dim); }
 
-  /* ── Token Stats ── */
+  .session-toggle {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    transition: transform var(--transition), color var(--transition);
+    flex-shrink: 0;
+    margin-top: 3px;
+    width: 22px; text-align: center;
+    font-family: monospace;
+  }
+  .session-card.open .session-toggle { transform: rotate(180deg); color: var(--copper); }
+
+  /* ── Token Stats Bar ── */
   .token-stats {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px 14px;
-    margin-top: 8px;
-    padding: 8px 12px;
-    background: var(--bg);
-    border-radius: 6px;
+    gap: 0 16px;
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: var(--ink-700);
+    border-radius: var(--radius);
     border: 1px solid var(--border);
   }
   .token-total {
-    font-size: 1rem;
+    font-size: 1.05rem;
     font-weight: 700;
     color: var(--text);
     display: flex;
-    align-items: center;
-    gap: 4px;
+    align-items: baseline;
+    gap: 5px;
+    font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
   }
-  .token-total .val { color: var(--accent); }
+  .token-total .val { color: var(--blue); font-size: 1.15rem; }
+  .token-total .unit { font-size: 0.65rem; color: var(--text-muted); font-weight: 500; font-family: 'Inter', sans-serif; }
   .token-item {
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: 4px;
     font-size: 0.7rem;
     color: var(--text-muted);
+    font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
   }
-  .token-item .val { font-weight: 600; }
+  .token-item .val { font-weight: 600; font-size: 0.75rem; }
+  .token-item .lbl { font-family: 'Inter', sans-serif; font-size: 0.66rem; color: var(--text-muted); }
   .token-in .val { color: #a5d6ff; }
   .token-out .val { color: #ffcc80; }
-  .token-cache-hit .val { color: #7ee787; }       /* 浅绿色：缓存命中 */
-  .token-cache-miss .val { color: #2ea043; }       /* 深绿色：缓存未命中 */
+  .token-cache-hit .val { color: var(--cache-hit); }
+  .token-cache-miss .val { color: var(--cache-miss); }
   .token-ratio {
-    font-size: 0.68rem;
-    color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    gap: 3px;
+    display: flex; align-items: center; gap: 4px;
   }
+  .token-ratio .lbl { font-size: 0.66rem; color: var(--text-muted); font-family: 'Inter', sans-serif; }
   .token-ratio .val {
-    font-weight: 600;
-    color: #7ee787;
+    font-weight: 700;
+    color: var(--cache-hit);
+    font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
+    font-size: 0.78rem;
   }
   .token-divider {
     width: 1px;
-    height: 16px;
+    height: 18px;
     background: var(--border);
-  }
-
-  .session-toggle {
-    font-size: 1.2rem;
-    color: var(--text-muted);
-    transition: var(--transition);
-    flex-shrink: 0;
-    margin-top: 2px;
-  }
-  .session-card.open .session-toggle { transform: rotate(180deg); color: var(--accent); }
-
-  /* ── Copy Button ── */
-  .copy-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 2px 8px;
-    border-radius: 4px;
-    border: 1px solid var(--border);
-    background: var(--bg-tertiary);
-    color: var(--text-muted);
-    font-size: 0.72rem;
-    cursor: pointer;
-    transition: var(--transition);
-    font-family: inherit;
-    white-space: nowrap;
-    vertical-align: middle;
-  }
-  .copy-btn:hover {
-    border-color: var(--accent);
-    color: var(--accent);
-    background: rgba(88,166,255,0.08);
-  }
-  .copy-btn:active { transform: scale(0.95); }
-  .copy-btn.copied {
-    border-color: var(--green);
-    color: var(--green);
-    background: rgba(63,185,80,0.1);
-  }
-  .session-id-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.72rem;
-    color: var(--text-muted);
-    margin-bottom: 4px;
-    font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
-  }
-  .session-id-row .sid {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 340px;
   }
 
   /* ── Session Body (expandable) ── */
   .session-body {
     display: none;
     border-top: 1px solid var(--border);
-    padding: 16px 20px;
-    background: var(--bg);
+    padding: 16px 18px;
+    background: var(--ink-900);
   }
   .session-card.open .session-body { display: block; }
 
   .session-body h4 {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 600;
     color: var(--text-secondary);
     margin-bottom: 12px;
     display: flex;
     align-items: center;
     gap: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
   }
 
   /* ── User Messages List ── */
   .msg-list { list-style: none; }
   .msg-item {
     padding: 10px 14px;
-    background: var(--bg-secondary);
+    background: var(--ink-800);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    margin-bottom: 8px;
-    font-size: 0.85rem;
+    border-radius: var(--radius);
+    margin-bottom: 7px;
+    font-size: 0.84rem;
     color: var(--text);
     word-break: break-word;
     line-height: 1.5;
   }
   .msg-item .msg-time {
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     color: var(--text-muted);
-    margin-bottom: 4px;
+    margin-bottom: 3px;
+    font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
   }
   .msg-item .msg-agent {
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     color: var(--purple);
     margin-bottom: 2px;
   }
   .no-msgs {
     color: var(--text-muted);
-    font-size: 0.85rem;
+    font-size: 0.84rem;
     font-style: italic;
+  }
+  .msg-number {
+    display: inline-block;
+    color: var(--copper);
+    font-weight: 600;
+    margin-right: 6px;
+    font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
+    font-size: 0.7rem;
   }
 
   /* ── Pagination ── */
@@ -361,54 +459,62 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    margin-top: 24px;
+    gap: 6px;
+    margin-top: 22px;
     flex-wrap: wrap;
   }
   .pagination button {
-    min-width: 38px;
+    min-width: 36px;
     text-align: center;
-    padding: 8px 12px;
+    padding: 7px 11px;
+    font-size: 0.82rem;
+    font-weight: 500;
   }
   .pagination button.active {
-    background: var(--accent);
-    color: #fff;
-    border-color: var(--accent);
-    font-weight: 600;
+    background: var(--copper);
+    color: #14181f;
+    border-color: var(--copper);
+    font-weight: 700;
   }
   .pagination button:disabled {
-    opacity: 0.4;
+    opacity: 0.3;
     cursor: not-allowed;
     pointer-events: none;
   }
   .pagination .ellipsis {
     color: var(--text-muted);
-    padding: 0 4px;
+    padding: 0 2px;
+    font-weight: 600;
   }
   .pagination-info {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     color: var(--text-muted);
-    margin-left: 8px;
+    margin-left: 6px;
   }
 
   /* ── Footer ── */
   .footer {
     text-align: center;
-    padding: 20px;
+    padding: 16px;
     color: var(--text-muted);
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     border-top: 1px solid var(--border);
-    margin-top: 40px;
+    margin-top: 36px;
+    letter-spacing: 0.02em;
   }
 
   /* ── Responsive ── */
   @media (max-width: 768px) {
-    .container { padding: 12px; }
-    .header { padding: 12px 16px; }
-    .session-header { padding: 12px 16px; }
+    .container { padding: 12px 14px; }
+    .header { padding: 10px 14px; }
+    .header h1 { font-size: 1rem; }
+    .session-header { padding: 12px 14px; }
     .session-meta { gap: 4px 10px; }
-    .session-meta .dir { max-width: 180px; }
-    .controls { gap: 8px; }
+    .session-meta .dir { max-width: 160px; }
+    .controls { gap: 6px; padding: 10px 12px; }
+    .search-box { max-width: none; }
+    .token-stats { gap: 4px 10px; padding: 8px 10px; }
+    .token-total { font-size: 0.9rem; }
   }
 </style>
 </head>
@@ -416,7 +522,10 @@
 
 <div class="header">
   <div class="header-inner">
-    <h1><span class="icon">📋</span> OpenCode Session Viewer</h1>
+    <div class="header-brand">
+      <div class="header-logo">▸</div>
+      <h1>OpenCode Session Viewer</h1>
+    </div>
     <div class="header-stats" id="headerStats">加载中...</div>
   </div>
 </div>
@@ -424,24 +533,21 @@
 <div class="container">
   <!-- Controls -->
   <div class="controls">
-    <input type="text" id="searchInput" placeholder="🔍 搜索 Session ID 或标题..." oninput="onSearch()"
-      style="flex:1;min-width:200px;max-width:360px;background:var(--bg-tertiary);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:8px 14px;font-size:0.85rem;font-family:inherit;transition:var(--transition);"
-      onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"
-    />
-    <label for="pageSize">每页：</label>
+    <input type="text" id="searchInput" class="search-box" placeholder="搜索 Session ID 或标题..." oninput="onSearch()" />
+    <label for="pageSize">每页</label>
     <select id="pageSize" onchange="changePageSize()">
       <option value="10">10</option>
       <option value="20" selected>20</option>
       <option value="50">50</option>
     </select>
-    <label for="sortOrder">排序：</label>
+    <label for="sortOrder">排序</label>
     <select id="sortOrder" onchange="changeSort()">
       <option value="desc" selected>最新在前</option>
       <option value="asc">最早在前</option>
-      <option value="user_msg_desc">💬 用户输入最多</option>
-      <option value="user_msg_asc">💬 用户输入最少</option>
+      <option value="user_msg_desc">💬 输入最多</option>
+      <option value="user_msg_asc">💬 输入最少</option>
     </select>
-    <button onclick="refreshSessions()" title="刷新">🔄 刷新</button>
+    <button onclick="refreshSessions()" title="刷新">🔄</button>
   </div>
 
   <!-- Loading -->
@@ -558,22 +664,22 @@ function buildTokenStats(s) {
 
   let html = '<div class="token-stats">';
 
-  // Total tokens (larger)
-  html += `<span class="token-total">📊 <span class="val">${formatNum(total)}</span> tokens</span>`;
+  // Total tokens (larger, prominent)
+  html += `<span class="token-total"><span class="val">${formatNum(total)}</span><span class="unit">tokens</span></span>`;
   html += '<span class="token-divider"></span>';
 
   // Input / Output
-  html += `<span class="token-item token-in">📥 入 <span class="val">${formatNum(input)}</span></span>`;
-  html += `<span class="token-item token-out">📤 出 <span class="val">${formatNum(output)}</span></span>`;
+  html += `<span class="token-item token-in"><span class="lbl">入</span> <span class="val">${formatNum(input)}</span></span>`;
+  html += `<span class="token-item token-out"><span class="lbl">出</span> <span class="val">${formatNum(output)}</span></span>`;
 
   // Cache info
   if (cacheTotal > 0) {
     html += '<span class="token-divider"></span>';
-    html += `<span class="token-item token-cache-hit">🎯 缓存命中 <span class="val">${formatNum(cacheHit)}</span></span>`;
-    html += `<span class="token-item token-cache-miss">💾 缓存未命中 <span class="val">${formatNum(cacheMiss)}</span></span>`;
+    html += `<span class="token-item token-cache-hit"><span class="lbl">命中</span> <span class="val">${formatNum(cacheHit)}</span></span>`;
+    html += `<span class="token-item token-cache-miss"><span class="lbl">未命中</span> <span class="val">${formatNum(cacheMiss)}</span></span>`;
     const totalInput = input + cacheHit + cacheMiss;
     const ratio = totalInput > 0 ? (cacheHit / totalInput * 100).toFixed(2) : '0.00';
-    html += `<span class="token-ratio">命中率 <span class="val">${ratio}%</span></span>`;
+    html += `<span class="token-ratio"><span class="lbl">命中率</span> <span class="val">${ratio}%</span></span>`;
   }
 
   html += '</div>';
