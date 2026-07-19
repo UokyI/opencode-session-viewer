@@ -805,7 +805,8 @@ function renderSessions() {
           <div class="session-main">
             <div class="session-id-row">
               <span class="sid" title="${escapeHtml(s.id)}">${escapeHtml(s.id)}</span>
-              <button class="copy-btn" onclick="event.stopPropagation(); copySessionId('${escapeHtml(s.id)}', this)" title="复制 Session ID">📋 复制</button>
+              <button class="copy-btn" onclick="event.stopPropagation(); copySessionId('${escapeHtml(s.id)}', this)" title="复制 Session ID">📋</button>
+              <button class="copy-btn" onclick="event.stopPropagation(); exportSession('${escapeHtml(s.id)}', '${escapeHtml(s.title.replace(/'/g, "\\'"))}', '${escapeHtml(formatTime(s.time_created))}', this)" title="导出为 JSON">📥</button>
             </div>
             <div class="session-title">${escapeHtml(s.title)}</div>
             ${tokenStatsHtml}
@@ -874,14 +875,13 @@ function renderPagination() {
 function copySessionId(sessionId, btn) {
   navigator.clipboard.writeText(sessionId).then(() => {
     const orig = btn.innerHTML;
-    btn.innerHTML = '✅ 已复制';
+    btn.innerHTML = '✅';
     btn.classList.add('copied');
     setTimeout(() => {
       btn.innerHTML = orig;
       btn.classList.remove('copied');
     }, 1500);
   }).catch(() => {
-    // Fallback
     const ta = document.createElement('textarea');
     ta.value = sessionId;
     ta.style.position = 'fixed'; ta.style.opacity = '0';
@@ -890,13 +890,58 @@ function copySessionId(sessionId, btn) {
     document.execCommand('copy');
     document.body.removeChild(ta);
     const orig = btn.innerHTML;
-    btn.innerHTML = '✅ 已复制';
+    btn.innerHTML = '✅';
     btn.classList.add('copied');
     setTimeout(() => {
       btn.innerHTML = orig;
       btn.classList.remove('copied');
     }, 1500);
   });
+}
+
+// ─── Export ──────────────────────────────────────────────────
+async function exportSession(sessionId, title, timeStr, btn) {
+  const orig = btn.innerHTML;
+  btn.innerHTML = '⏳';
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/sessions/${sessionId}/export`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      throw new Error(err.error || 'Export failed');
+    }
+    const data = await res.json();
+    // Build filename: sanitized title + YYYYMMDDHHmmss
+    const now = new Date();
+    const ts = [
+      now.getFullYear(),
+      String(now.getMonth()+1).padStart(2,'0'),
+      String(now.getDate()).padStart(2,'0'),
+      String(now.getHours()).padStart(2,'0'),
+      String(now.getMinutes()).padStart(2,'0'),
+      String(now.getSeconds()).padStart(2,'0'),
+    ].join('');
+    const safeTitle = title.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, '_').substring(0, 80);
+    const filename = `${safeTitle}_${ts}.json`;
+
+    // Trigger download
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    btn.innerHTML = '✅';
+    setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 1500);
+  } catch (e) {
+    btn.innerHTML = '❌';
+    btn.title = e.message;
+    setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 2000);
+  }
 }
 
 // ─── Actions ─────────────────────────────────────────────────

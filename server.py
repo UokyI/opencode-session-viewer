@@ -7,6 +7,7 @@ import sqlite3
 import json
 import os
 import sys
+import subprocess
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
@@ -238,6 +239,11 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self._send_json(api_sessions(params))
                 return
 
+            if path.startswith("/api/sessions/") and path.endswith("/export"):
+                session_id = path.split("/")[3]  # /api/sessions/{id}/export
+                api_export_session(self, session_id)
+                return
+
             if path.startswith("/api/sessions/") and path.endswith("/messages"):
                 session_id = path.split("/")[3]  # /api/sessions/{id}/messages
                 params["_session_id"] = session_id
@@ -265,6 +271,33 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
+
+
+def api_export_session(handler, session_id):
+    """GET /api/sessions/{id}/export — run opencode export and return JSON."""
+    try:
+        result = subprocess.run(
+            ["opencode", "export", session_id],
+            capture_output=True, text=True, timeout=30,
+            shell=True,
+        )
+        # opencode prints "Exporting session: ..." to stderr, actual JSON to stdout
+        stdout = result.stdout.strip()
+        if not stdout:
+            handler._send_error(500, "opencode export returned empty output")
+            return
+
+        # Try to parse as JSON to validate
+        data = json.loads(stdout)
+        handler._send_json(data)
+    except subprocess.TimeoutExpired:
+        handler._send_error(504, "opencode export timed out")
+    except FileNotFoundError:
+        handler._send_error(500, "opencode CLI not found. Is it installed?")
+    except json.JSONDecodeError as e:
+        handler._send_error(500, f"Invalid JSON from opencode: {e}")
+    except Exception as e:
+        handler._send_error(500, str(e))
 
 
 def api_session_messages_by_id(session_id, params):
