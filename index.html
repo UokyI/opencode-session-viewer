@@ -13,7 +13,7 @@
      elements, cool blue for neutral data, soft green for cache
      efficiency signals.
   ──────────────────────────────────────────────────────────── */
-  :root {
+  :root, [data-theme="dark"] {
     --ink-900: #14181f;
     --ink-800: #1a1f28;
     --ink-700: #212733;
@@ -43,7 +43,42 @@
     --cost-dim: rgba(224,108,117,0.12);
     --purple: #c678dd;
     --purple-dim: rgba(198,120,221,0.1);
+  }
 
+  /* ── Light Theme ── */
+  [data-theme="light"] {
+    --ink-900: #f0f2f5;
+    --ink-800: #f6f8fa;
+    --ink-700: #ffffff;
+    --ink-600: #e8ecf0;
+    --ink-500: #dde2e8;
+    --ink-400: #b0b8c4;
+    --border: #dde2e8;
+    --border-hover: #b0b8c4;
+
+    --text: #1a1f28;
+    --text-secondary: #5a6478;
+    --text-muted: #8a94a6;
+
+    --copper: #b8861e;
+    --copper-hover: #9a6f16;
+    --copper-dim: rgba(184,134,30,0.08);
+    --copper-border: rgba(184,134,30,0.2);
+
+    --blue: #2973b8;
+    --blue-dim: rgba(41,115,184,0.08);
+
+    --cache-hit: #2d8a47;
+    --cache-hit-dim: rgba(45,138,71,0.08);
+    --cache-miss: #1a5c2e;
+
+    --cost: #c0392b;
+    --cost-dim: rgba(192,57,43,0.08);
+    --purple: #8b3fae;
+    --purple-dim: rgba(139,63,174,0.08);
+  }
+
+  :root {
     --radius: 6px;
     --radius-lg: 10px;
     --transition: 0.15s ease;
@@ -105,6 +140,25 @@
     font-weight: 500;
   }
   .header-stats span { color: var(--copper); font-weight: 600; }
+
+  /* Theme toggle */
+  .theme-btn {
+    width: 34px; height: 34px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 1.1rem;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--ink-700);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: var(--transition);
+    line-height: 1;
+  }
+  .theme-btn:hover {
+    border-color: var(--copper);
+    background: var(--copper-dim);
+    transform: scale(1.08);
+  }
 
   /* ── Layout ── */
   .container {
@@ -526,7 +580,10 @@
       <div class="header-logo">▸</div>
       <h1>OpenCode Session Viewer</h1>
     </div>
-    <div class="header-stats" id="headerStats">加载中...</div>
+    <div style="display:flex;align-items:center;gap:14px;">
+      <button id="themeToggle" onclick="toggleTheme()" title="切换主题" class="theme-btn">🌙</button>
+      <div class="header-stats" id="headerStats">加载中...</div>
+    </div>
   </div>
 </div>
 
@@ -571,6 +628,26 @@
 </div>
 
 <script>
+// ─── Theme ───────────────────────────────────────────────────
+(function initTheme() {
+  const saved = localStorage.getItem('opencode-theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+  updateThemeIcon(saved);
+})();
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'light' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('opencode-theme', next);
+  updateThemeIcon(next);
+}
+
+function updateThemeIcon(theme) {
+  const btn = document.getElementById('themeToggle');
+  if (btn) btn.textContent = theme === 'light' ? '☀️' : '🌙';
+}
+
 // ─── State ───────────────────────────────────────────────────
 const state = {
   page: 1,
