@@ -33,8 +33,7 @@ python server.py --port 8765 --db "C:\path\to\opencode.db"
 - **前端**: 原生 HTML/CSS/JS，暗色主题
 
 ## 截图
-![示例](Clip_2026-07-19_21-04-34.png)
-
+![示例](示例.png)
 ## License
 
 MIT
