@@ -12,14 +12,17 @@
 ## 快速开始
 
 ```bash
-# 默认端口 8080，自动检测 opencode.db 路径
+# 方式一：双击 start.bat（Windows）
+start.bat
+
+# 方式二：命令行启动（自动打开浏览器）
 python server.py
 
 # 指定端口和数据库路径
 python server.py --port 8765 --db "C:\path\to\opencode.db"
 ```
 
-浏览器打开 `http://localhost:8080` 即可。
+浏览器自动打开，无需手动操作。
 
 ## 数据库路径
 
