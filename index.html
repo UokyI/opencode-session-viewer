@@ -424,11 +424,15 @@
 <div class="container">
   <!-- Controls -->
   <div class="controls">
-    <label for="pageSize">每页显示：</label>
+    <input type="text" id="searchInput" placeholder="🔍 搜索 Session ID 或标题..." oninput="onSearch()"
+      style="flex:1;min-width:200px;max-width:360px;background:var(--bg-tertiary);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:8px 14px;font-size:0.85rem;font-family:inherit;transition:var(--transition);"
+      onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"
+    />
+    <label for="pageSize">每页：</label>
     <select id="pageSize" onchange="changePageSize()">
-      <option value="10">10 条</option>
-      <option value="20" selected>20 条</option>
-      <option value="50">50 条</option>
+      <option value="10">10</option>
+      <option value="20" selected>20</option>
+      <option value="50">50</option>
     </select>
     <label for="sortOrder">排序：</label>
     <select id="sortOrder" onchange="changeSort()">
@@ -466,11 +470,13 @@ const state = {
   page: 1,
   limit: 20,
   sort: 'desc',
+  query: '',
   total: 0,
   totalPages: 0,
   sessions: [],
   expandedSessions: new Set(),
   sessionMessages: {},  // cache: sessionId -> messages[]
+  searchTimer: null,
 };
 
 // ─── API ─────────────────────────────────────────────────────
@@ -491,15 +497,17 @@ async function loadSessions() {
   document.getElementById('sessionList').innerHTML = '';
 
   try {
-    const data = await api(`/api/sessions?page=${state.page}&limit=${state.limit}&sort=${state.sort}`);
+    const q = state.query ? `&q=${encodeURIComponent(state.query)}` : '';
+    const data = await api(`/api/sessions?page=${state.page}&limit=${state.limit}&sort=${state.sort}${q}`);
     state.sessions = data.sessions;
     state.total = data.total;
     state.totalPages = data.total_pages;
     state.expandedSessions.clear();
     state.sessionMessages = {};
 
+    const searchInfo = state.query ? ` 搜索 "<span>${escapeHtml(state.query)}</span>"` : '';
     document.getElementById('headerStats').innerHTML =
-      `共 <span>${data.total}</span> 个会话，第 <span>${data.page}</span> / <span>${data.total_pages}</span> 页`;
+      `共 <span>${data.total}</span> 个会话${searchInfo}，第 <span>${data.page}</span> / <span>${data.total_pages}</span> 页`;
 
     renderSessions();
     renderPagination();
@@ -771,7 +779,18 @@ function changeSort() {
   loadSessions();
 }
 
+function onSearch() {
+  clearTimeout(state.searchTimer);
+  state.searchTimer = setTimeout(() => {
+    state.query = document.getElementById('searchInput').value.trim();
+    state.page = 1;
+    loadSessions();
+  }, 300);
+}
+
 function refreshSessions() {
+  document.getElementById('searchInput').value = '';
+  state.query = '';
   state.expandedSessions.clear();
   state.sessionMessages = {};
   loadSessions();

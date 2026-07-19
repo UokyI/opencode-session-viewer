@@ -45,10 +45,11 @@ def get_db():
 
 # ─── API Handlers ─────────────────────────────────────────────
 def api_sessions(params):
-    """GET /api/sessions?page=1&limit=10&sort=desc"""
+    """GET /api/sessions?page=1&limit=10&sort=desc&q=search"""
     page = int(params.get("page", [1])[0])
     limit = int(params.get("limit", [10])[0])
     sort = params.get("sort", ["desc"])[0]
+    query = params.get("q", [""])[0].strip()
     limit = min(max(limit, 1), 100)  # clamp 1-100
     offset = (page - 1) * limit
 
@@ -63,8 +64,18 @@ def api_sessions(params):
 
     conn = get_db()
     try:
-        # Total count
-        total = conn.execute("SELECT COUNT(*) FROM session").fetchone()[0]
+        # Build WHERE clause for search
+        where_clause = ""
+        where_params = []
+        if query:
+            where_clause = "WHERE s.id LIKE ? OR s.title LIKE ?"
+            like_q = f"%{query}%"
+            where_params = [like_q, like_q]
+
+        # Total count (filtered)
+        total = conn.execute(
+            f"SELECT COUNT(*) FROM session s {where_clause}", where_params
+        ).fetchone()[0]
 
         # Sessions with message counts
         rows = conn.execute(f"""
@@ -72,9 +83,10 @@ def api_sessions(params):
                    (SELECT COUNT(*) FROM message m WHERE m.session_id = s.id) as message_count,
                    (SELECT COUNT(*) FROM message m WHERE m.session_id = s.id AND json_extract(m.data, '$.role')='user') as user_message_count
             FROM session s
+            {where_clause}
             ORDER BY {order_clause}
             LIMIT ? OFFSET ?
-        """, (limit, offset)).fetchall()
+        """, where_params + [limit, offset]).fetchall()
 
         sessions = []
         for r in rows:
