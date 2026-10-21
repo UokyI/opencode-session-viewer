@@ -7,6 +7,7 @@
 - 📋 按创建时间浏览所有 session（分页 10 / 20 / 50）
 - 💬 展开查看每个 session 最近 10 次用户输入
 - 💰 展示 token 用量、成本、agent、model 等元信息
+- 📂 路径独立显示，支持复制和一键打开所在文件夹
 - ⚡ 纯 Python 标准库，零依赖
 
 ## 快速开始
@@ -33,7 +34,7 @@ python server.py --port 8765 --db "C:\path\to\opencode.db"
 ## 技术栈
 
 - **后端**: Python 3 + http.server + sqlite3（全标准库）
-- **前端**: 原生 HTML/CSS/JS，暗色主题
+- **前端**: 原生 HTML/CSS/JS，明暗双主题
 
 ## 截图
 ![示例](示例.png)

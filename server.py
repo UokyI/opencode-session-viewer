@@ -7,9 +7,10 @@ import sqlite3
 import json
 import os
 import sys
+import shutil
 import subprocess
 import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
 # ─── Configuration ───────────────────────────────────────────
@@ -43,6 +44,15 @@ def get_db():
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.execute("PRAGMA busy_timeout=5000")
     return conn
+
+def open_directory(path):
+    """Open a folder in the platform file manager."""
+    if os.name == "nt":
+        os.startfile(path)
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", path])
+    else:
+        subprocess.Popen(["xdg-open", path])
 
 # ─── API Handlers ─────────────────────────────────────────────
 def api_sessions(params):
@@ -265,35 +275,91 @@ class RequestHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._send_error(500, str(e))
 
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        path = parsed.path.rstrip("/") or "/"
+
+        if path != "/api/open-folder":
+            self._send_error(404, "Not Found")
+            return
+
+        if self.client_address[0] not in ("127.0.0.1", "::1", "::ffff:127.0.0.1"):
+            self._send_error(403, "Folder opening is available locally only")
+            return
+
+        origin = self.headers.get("Origin")
+        if origin:
+            origin_host = urlparse(origin).netloc
+            request_host = self.headers.get("Host", "")
+            if origin_host != request_host:
+                self._send_error(403, "Cross-origin request rejected")
+                return
+
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            if length <= 0 or length > 4096:
+                self._send_error(400, "Invalid request body")
+                return
+
+            payload = json.loads(self.rfile.read(length).decode("utf-8"))
+            folder = payload.get("path")
+            if not isinstance(folder, str) or not folder.strip():
+                self._send_error(400, "Missing folder path")
+                return
+
+            folder = os.path.abspath(os.path.expandvars(os.path.expanduser(folder.strip())))
+            if os.path.isfile(folder):
+                folder = os.path.dirname(folder)
+            if not os.path.isdir(folder):
+                self._send_error(404, "Folder not found")
+                return
+
+            open_directory(folder)
+            self._send_json({"ok": True, "path": folder})
+        except (ValueError, json.JSONDecodeError) as e:
+            self._send_error(400, f"Invalid request: {e}")
+        except Exception as e:
+            self._send_error(500, str(e))
+
     def do_OPTIONS(self):
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
 
 def api_export_session(handler, session_id):
     """GET /api/sessions/{id}/export — run opencode export and return JSON."""
+    command = shutil.which("opencode")
+    if not command:
+        handler._send_error(500, "opencode CLI not found. Is it installed?")
+        return
+
     try:
         result = subprocess.run(
-            ["opencode", "export", session_id],
-            capture_output=True, text=True, timeout=30,
-            shell=True,
+            [command, "export", session_id],
+            capture_output=True, timeout=120,
+            shell=False,
         )
-        # opencode prints "Exporting session: ..." to stderr, actual JSON to stdout
-        stdout = result.stdout.strip()
-        if not stdout:
-            handler._send_error(500, "opencode export returned empty output")
+        # opencode writes UTF-8 JSON to stdout, progress text to stderr.
+        stdout = result.stdout.decode("utf-8-sig", errors="replace").strip()
+        stderr = result.stderr.decode("utf-8", errors="replace").strip()
+
+        if result.returncode != 0:
+            detail = stderr[-600:] or f"exit code {result.returncode}"
+            handler._send_error(500, f"opencode export failed: {detail}")
             return
 
-        # Try to parse as JSON to validate
+        if not stdout:
+            detail = stderr[-600:] or "no output"
+            handler._send_error(500, f"opencode export returned empty output: {detail}")
+            return
+
         data = json.loads(stdout)
         handler._send_json(data)
     except subprocess.TimeoutExpired:
-        handler._send_error(504, "opencode export timed out")
-    except FileNotFoundError:
-        handler._send_error(500, "opencode CLI not found. Is it installed?")
+        handler._send_error(504, "opencode export timed out after 120 seconds")
     except json.JSONDecodeError as e:
         handler._send_error(500, f"Invalid JSON from opencode: {e}")
     except Exception as e:
@@ -395,7 +461,7 @@ def main():
     if not os.environ.get("OPENCODE_NO_BROWSER"):
         threading.Thread(target=_open_browser, args=(url,), daemon=True).start()
 
-    server = HTTPServer(("0.0.0.0", PORT), RequestHandler)
+    server = ThreadingHTTPServer(("0.0.0.0", PORT), RequestHandler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

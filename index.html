@@ -3,649 +3,1495 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OpenCode Session Viewer</title>
+<meta name="color-scheme" content="light dark">
+<title>Sessions · OpenCode</title>
+<script>
+  (function () {
+    try {
+      var saved = localStorage.getItem('opencode-theme');
+      var theme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.dataset.theme = theme;
+    } catch (error) {
+      document.documentElement.dataset.theme = 'light';
+    }
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  /* ── Design Tokens ──────────────────────────────────────────
-     Palette: Deep Slate × Warm Copper
-     A developer tool should feel precise, calm, and data-forward.
-     Slate-ink backgrounds evoke terminal depth without the harsh
-     green-on-black cliché. Copper/gold accents for actionable
-     elements, cool blue for neutral data, soft green for cache
-     efficiency signals.
-  ──────────────────────────────────────────────────────────── */
-  :root, [data-theme="dark"] {
-    --ink-900: #14181f;
-    --ink-800: #1a1f28;
-    --ink-700: #212733;
-    --ink-600: #2a3140;
-    --ink-500: #353d4f;
-    --ink-400: #4a5468;
-    --border: #2d3545;
-    --border-hover: #414c62;
-
-    --text: #d6deeb;
-    --text-secondary: #8895ad;
-    --text-muted: #596782;
-
-    --copper: #d4a853;
-    --copper-hover: #e2be6e;
-    --copper-dim: rgba(212,168,83,0.12);
-    --copper-border: rgba(212,168,83,0.25);
-
-    --blue: #61afef;
-    --blue-dim: rgba(97,175,239,0.12);
-
-    --cache-hit: #7ec98f;
-    --cache-hit-dim: rgba(126,201,143,0.1);
-    --cache-miss: #4a8c5d;
-
-    --cost: #e06c75;
-    --cost-dim: rgba(224,108,117,0.12);
-    --purple: #c678dd;
-    --purple-dim: rgba(198,120,221,0.1);
-  }
-
-  /* ── Light Theme ── */
-  [data-theme="light"] {
-    --ink-900: #f0f2f5;
-    --ink-800: #f6f8fa;
-    --ink-700: #ffffff;
-    --ink-600: #e8ecf0;
-    --ink-500: #dde2e8;
-    --ink-400: #b0b8c4;
-    --border: #dde2e8;
-    --border-hover: #b0b8c4;
-
-    --text: #1a1f28;
-    --text-secondary: #5a6478;
-    --text-muted: #8a94a6;
-
-    --copper: #b8861e;
-    --copper-hover: #9a6f16;
-    --copper-dim: rgba(184,134,30,0.08);
-    --copper-border: rgba(184,134,30,0.2);
-
-    --blue: #2973b8;
-    --blue-dim: rgba(41,115,184,0.08);
-
-    --cache-hit: #2d8a47;
-    --cache-hit-dim: rgba(45,138,71,0.08);
-    --cache-miss: #1a5c2e;
-
-    --cost: #c0392b;
-    --cost-dim: rgba(192,57,43,0.08);
-    --purple: #8b3fae;
-    --purple-dim: rgba(139,63,174,0.08);
-  }
-
+  /* ── Tokens ───────────────────────────────────────────────── */
   :root {
-    --radius: 6px;
+    color-scheme: light;
+    --bg: #e9f1f7;
+    --bg-deep: #dce8f2;
+    --halo-1: rgba(167, 158, 184, 0.55);
+    --halo-2: rgba(205, 216, 204, 0.45);
+    --halo-3: rgba(170, 201, 177, 0.42);
+    --surface: rgba(255, 255, 255, 0.52);
+    --surface-strong: rgba(255, 255, 255, 0.82);
+    --surface-soft: rgba(255, 255, 255, 0.28);
+    --chrome: rgba(248, 252, 255, 0.58);
+    --glass-top: rgba(255, 255, 255, 0.76);
+    --glass-bottom: rgba(255, 255, 255, 0.38);
+    --glass-border: rgba(255, 255, 255, 0.72);
+    --glass-edge: rgba(30, 70, 105, 0.09);
+    --glass-shadow: 0 20px 44px -24px rgba(24, 62, 96, 0.38), 0 2px 6px rgba(24, 62, 96, 0.06);
+    --sheen: rgba(255, 255, 255, 0.92);
+    --ink: #0f1d2c;
+    --ink-soft: #2c4055;
+    --muted: #51687e;
+    --faint: #6b8095;
+    --line: rgba(23, 56, 86, 0.11);
+    --line-strong: rgba(23, 56, 86, 0.2);
+    --accent: #0f68d6;
+    --accent-strong: #0a4fa9;
+    --accent-wash: rgba(15, 104, 214, 0.1);
+    --accent-glow: rgba(15, 104, 214, 0.3);
+    --positive: #0d7868;
+    --danger: #ad3b2c;
+    --danger-wash: rgba(173, 59, 44, 0.08);
+    --focus-ring: 0 0 0 3px var(--accent-wash);
+    --date-col: 136px;
+    --figures-col: 232px;
+    --radius: 8px;
     --radius-lg: 10px;
-    --transition: 0.15s ease;
+    --radius-xl: 12px;
+    --pill: 999px;
+    --blur: blur(18px) saturate(150%);
+    --font-sans: 'Archivo', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'Cascadia Mono', 'SFMono-Regular', Consolas, monospace;
   }
 
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  [data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #07131e;
+    --bg-deep: #0a1a27;
+    --halo-1: rgba(31, 118, 148, 0.34);
+    --halo-2: rgba(58, 92, 190, 0.26);
+    --halo-3: rgba(24, 128, 111, 0.24);
+    --surface: rgba(20, 38, 54, 0.55);
+    --surface-strong: rgba(28, 49, 68, 0.8);
+    --surface-soft: rgba(20, 38, 54, 0.28);
+    --chrome: rgba(13, 27, 40, 0.6);
+    --glass-top: rgba(43, 69, 92, 0.5);
+    --glass-bottom: rgba(16, 31, 45, 0.44);
+    --glass-border: rgba(173, 214, 243, 0.16);
+    --glass-edge: rgba(173, 214, 243, 0.08);
+    --glass-shadow: 0 24px 52px -26px rgba(0, 0, 0, 0.85), 0 2px 8px rgba(0, 0, 0, 0.3);
+    --sheen: rgba(255, 255, 255, 0.14);
+    --ink: #e9f3fb;
+    --ink-soft: #bdcedd;
+    --muted: #93a9bc;
+    --faint: #7f95a9;
+    --line: rgba(163, 205, 235, 0.12);
+    --line-strong: rgba(163, 205, 235, 0.22);
+    --accent: #7cc4ff;
+    --accent-strong: #a8d8ff;
+    --accent-wash: rgba(124, 196, 255, 0.12);
+    --accent-glow: rgba(124, 196, 255, 0.34);
+    --positive: #6fd8bc;
+    --danger: #ffa896;
+    --danger-wash: rgba(255, 168, 150, 0.09);
+  }
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  /* ── Base ─────────────────────────────────────────────────── */
+  * { box-sizing: border-box; }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    background: linear-gradient(180deg, var(--bg), var(--bg-deep));
+    min-height: 100%;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
 
   body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: var(--ink-900);
-    color: var(--text);
-    line-height: 1.55;
+    position: relative;
+    isolation: isolate;
+    margin: 0;
     min-height: 100vh;
+    background: transparent;
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
-  /* ── Header ── */
-  .header {
-    background: linear-gradient(180deg, var(--ink-800) 0%, var(--ink-900) 100%);
-    border-bottom: 1px solid var(--border);
-    padding: 14px 24px;
+  body::before {
+    content: "";
+    position: fixed;
+    inset: -8vmax;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(38% 42% at 24% 22%, var(--halo-1), transparent 70%),
+      radial-gradient(34% 38% at 78% 26%, var(--halo-2), transparent 68%),
+      radial-gradient(44% 42% at 54% 88%, var(--halo-3), transparent 72%);
+    filter: blur(22px) saturate(115%);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    body::before { animation: drift 28s ease-in-out infinite alternate; }
+  }
+
+  ::selection {
+    background: var(--accent);
+    color: #ffffff;
+  }
+
+  ::-webkit-scrollbar { width: 12px; height: 12px; }
+
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: var(--pill);
+    background: color-mix(in srgb, var(--muted) 34%, transparent);
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--muted) 55%, transparent);
+    background-clip: content-box;
+  }
+
+  [hidden] { display: none !important; }
+
+  button, input, select { font: inherit; color: inherit; }
+
+  button {
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+
+  a { color: inherit; text-decoration: none; }
+
+  .icon {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .svg-sprite {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+  }
+
+  .visually-hidden {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* ── Header ───────────────────────────────────────────────── */
+  .site-header {
     position: sticky;
     top: 0;
-    z-index: 100;
-    backdrop-filter: blur(16px) saturate(120%);
+    z-index: 20;
+    background: var(--chrome);
+    border-bottom: 1px solid var(--glass-edge);
+    -webkit-backdrop-filter: blur(22px) saturate(165%);
+    backdrop-filter: blur(22px) saturate(165%);
+    box-shadow: 0 1px 0 var(--sheen) inset;
   }
-  .header-inner {
-    max-width: 1200px;
+
+  .header-inner,
+  .page {
+    width: 100%;
+    max-width: 1220px;
     margin: 0 auto;
+    padding-right: 28px;
+    padding-left: 28px;
+  }
+
+  .header-inner {
+    min-height: 60px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 12px;
+    gap: 24px;
   }
-  .header-brand {
+
+  .brand {
     display: flex;
     align-items: center;
     gap: 10px;
+    min-width: 0;
   }
-  .header-logo {
-    width: 32px; height: 32px;
-    background: linear-gradient(135deg, var(--copper) 0%, #b8883a 100%);
-    border-radius: 7px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1rem; color: #14181f; font-weight: 700;
+
+  .brand-mark {
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    flex: none;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 8px;
+    background:
+      linear-gradient(150deg, color-mix(in srgb, var(--accent) 72%, #ffffff), var(--accent) 45%, var(--accent-strong));
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.6) inset,
+      0 -3px 8px rgba(0, 20, 60, 0.22) inset,
+      0 6px 16px -6px var(--accent-glow);
   }
-  .header h1 {
-    font-size: 1.1rem;
+
+  .brand-mark::after {
+    content: "";
+    display: block;
+    width: 6px;
+    height: 6px;
+    border-radius: var(--pill);
+    background: #ffffff;
+    box-shadow: 0 0 8px 1px rgba(255, 255, 255, 0.9);
+  }
+
+  .brand-name {
+    font-size: 13px;
     font-weight: 600;
-    color: var(--text);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
   }
+
+  .brand-divider {
+    width: 1px;
+    height: 12px;
+    background: var(--line-strong);
+  }
+
+  .brand-source {
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+  }
+
+  .header-tail {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+  }
+
   .header-stats {
-    font-size: 0.82rem;
-    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 0;
+    padding: 6px 14px;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    background: var(--surface-soft);
+    box-shadow: 0 1px 0 var(--sheen) inset;
+    color: var(--muted);
+    font-size: 12px;
+    white-space: nowrap;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+
+  .header-stats strong {
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 12px;
     font-weight: 500;
   }
-  .header-stats span { color: var(--copper); font-weight: 600; }
 
-  /* Theme toggle */
-  .theme-btn {
-    width: 34px; height: 34px;
-    padding: 0;
-    border-radius: 50%;
-    font-size: 1.1rem;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--ink-700);
-    border: 1px solid var(--border);
-    cursor: pointer;
-    transition: var(--transition);
-    line-height: 1;
-  }
-  .theme-btn:hover {
-    border-color: var(--copper);
-    background: var(--copper-dim);
-    transform: scale(1.08);
+  .header-page {
+    color: var(--faint);
+    font-family: var(--font-mono);
+    font-size: 11px;
   }
 
-  /* ── Layout ── */
-  .container {
-    max-width: 1120px;
-    margin: 0 auto;
-    padding: 20px 24px 40px;
+  .header-query {
+    max-width: 22ch;
+    overflow: hidden;
+    color: var(--accent);
+    text-overflow: ellipsis;
   }
 
-  /* ── Controls ── */
+  .icon-button {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    color: var(--muted);
+    transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .icon-button:hover {
+    border-color: var(--glass-border);
+    background: var(--surface);
+    box-shadow: 0 1px 0 var(--sheen) inset, 0 6px 14px -8px rgba(24, 62, 96, 0.35);
+    color: var(--ink);
+  }
+
+  .theme-toggle {
+    border-color: var(--glass-border);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(165deg, var(--glass-top), var(--glass-bottom));
+    box-shadow: 0 1px 0 var(--sheen) inset, 0 4px 12px -8px rgba(24, 62, 96, 0.4);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+
+  .theme-toggle:hover { background: var(--surface-strong); }
+
+  .icon-sun,
+  [data-theme="dark"] .icon-moon { display: none; }
+
+  [data-theme="dark"] .icon-sun { display: block; }
+
+  /* ── Page frame ───────────────────────────────────────────── */
+  .page {
+    padding-top: 26px;
+    padding-bottom: 24px;
+  }
+
+  .index-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding-bottom: 20px;
+  }
+
+  .search-field {
+    position: relative;
+    flex: 1;
+    min-width: 220px;
+    max-width: 580px;
+  }
+
+  .search-field > .icon {
+    position: absolute;
+    top: 50%;
+    left: 12px;
+    transform: translateY(-50%);
+    color: var(--faint);
+    pointer-events: none;
+  }
+
+  .search-field input {
+    width: 100%;
+    height: 38px;
+    padding: 0 40px 0 38px;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(165deg, var(--glass-top), var(--glass-bottom));
+    box-shadow: 0 1px 0 var(--sheen) inset, 0 8px 20px -14px rgba(24, 62, 96, 0.4);
+    color: var(--ink);
+    font-size: 13px;
+    outline: none;
+    -webkit-backdrop-filter: blur(14px) saturate(150%);
+    backdrop-filter: blur(14px) saturate(150%);
+    transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .search-field input:hover { border-color: color-mix(in srgb, var(--accent) 24%, var(--glass-border)); }
+
+  .search-field input:focus {
+    border-color: color-mix(in srgb, var(--accent) 62%, transparent);
+    background: var(--surface-strong);
+    box-shadow: 0 0 0 3px var(--accent-wash), 0 0 24px -6px var(--accent-glow), 0 1px 0 var(--sheen) inset;
+  }
+
+  .search-field input::placeholder { color: var(--faint); }
+
+  .clear-search {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: translateY(-50%);
+    border-radius: 6px;
+    color: var(--faint);
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+
+  .clear-search:hover {
+    background: var(--surface-soft);
+    color: var(--ink);
+  }
+
+  .clear-search .icon { width: 13px; height: 13px; }
+
   .controls {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 18px;
-    flex-wrap: wrap;
-    padding: 12px 16px;
-    background: var(--ink-800);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-  }
-  .controls label {
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-    font-weight: 500;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-  }
-  .search-box {
-    flex: 1;
-    min-width: 180px;
-    max-width: 340px;
-    background: var(--ink-700);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 7px 12px 7px 32px;
-    font-size: 0.84rem;
-    font-family: inherit;
-    transition: var(--transition);
-    outline: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='%23596782'%3E%3Cpath d='M6.5 0a6.5 6.5 0 0 1 5.1 10.5l2.4 2.3-.7.7-2.3-2.4A6.5 6.5 0 1 1 6.5 0Zm0 1.5a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: 10px center;
-  }
-  .search-box::placeholder { color: var(--text-muted); }
-  .search-box:focus {
-    border-color: var(--copper);
-    box-shadow: 0 0 0 3px var(--copper-dim);
-  }
-  select, button {
-    background: var(--ink-700);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 7px 12px;
-    font-size: 0.82rem;
-    cursor: pointer;
-    transition: var(--transition);
-    font-family: inherit;
-    font-weight: 500;
-    outline: none;
-  }
-  select:hover, button:hover { border-color: var(--border-hover); background: var(--ink-600); }
-  select:focus-visible, button:focus-visible {
-    border-color: var(--copper);
-    box-shadow: 0 0 0 2px var(--copper-dim);
-  }
-  .btn-primary {
-    background: var(--copper);
-    color: #14181f;
-    border-color: var(--copper);
-    font-weight: 600;
-  }
-  .btn-primary:hover { background: var(--copper-hover); border-color: var(--copper-hover); }
-
-  /* ── Loading ── */
-  .loading {
-    text-align: center;
-    padding: 64px 20px;
-    color: var(--text-muted);
-  }
-  .spinner {
-    width: 32px; height: 32px;
-    border: 2.5px solid var(--border);
-    border-top-color: var(--copper);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-    margin: 0 auto 14px;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ── Error ── */
-  .error {
-    background: var(--cost-dim);
-    border: 1px solid rgba(224,108,117,0.35);
-    border-radius: var(--radius);
-    padding: 14px 18px;
-    color: var(--cost);
-    margin-bottom: 18px;
-    font-size: 0.85rem;
+    gap: 8px;
+    margin-left: auto;
   }
 
-  /* ── Session Card ── */
-  .session-card {
-    background: var(--ink-800);
-    border: 1px solid var(--border);
-    border-left: 3px solid transparent;
-    border-radius: var(--radius-lg);
-    margin-bottom: 10px;
-    overflow: hidden;
-    transition: border-color var(--transition), box-shadow var(--transition);
-  }
-  .session-card:hover {
-    border-color: var(--border-hover);
-    border-left-color: var(--ink-400);
-    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
-  }
-  .session-card.open {
-    border-left-color: var(--copper);
-    border-color: var(--copper-border);
-  }
-
-  .session-header {
+  .select-control {
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    padding: 14px 18px;
+    align-items: center;
+    gap: 7px;
+    color: var(--muted);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .select-shell {
+    position: relative;
+    display: block;
+  }
+
+  .select-shell select {
+    height: 38px;
+    padding: 0 30px 0 14px;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(165deg, var(--glass-top), var(--glass-bottom));
+    box-shadow: 0 1px 0 var(--sheen) inset, 0 8px 20px -14px rgba(24, 62, 96, 0.4);
+    color: var(--ink);
+    font-size: 12.5px;
     cursor: pointer;
-    user-select: none;
-    gap: 14px;
+    outline: none;
+    appearance: none;
+    -webkit-backdrop-filter: blur(14px) saturate(150%);
+    backdrop-filter: blur(14px) saturate(150%);
+    transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
   }
 
-  .session-main { flex: 1; min-width: 0; }
-  .session-title {
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--text);
-    margin-bottom: 2px;
-    word-break: break-word;
-    letter-spacing: -0.01em;
+  .select-shell select:hover { border-color: color-mix(in srgb, var(--accent) 24%, var(--glass-border)); }
+
+  .select-shell select:focus {
+    border-color: color-mix(in srgb, var(--accent) 62%, transparent);
+    box-shadow: 0 0 0 3px var(--accent-wash), 0 0 24px -6px var(--accent-glow), 0 1px 0 var(--sheen) inset;
+  }
+
+  .select-shell .icon {
+    position: absolute;
+    top: 50%;
+    right: 9px;
+    width: 13px;
+    height: 13px;
+    transform: translateY(-50%);
+    color: var(--faint);
+    pointer-events: none;
+  }
+
+  .refresh-button {
+    width: 38px;
+    height: 38px;
+    border-color: var(--glass-border);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(165deg, var(--glass-top), var(--glass-bottom));
+    box-shadow: 0 1px 0 var(--sheen) inset, 0 8px 20px -14px rgba(24, 62, 96, 0.4);
+    -webkit-backdrop-filter: blur(14px) saturate(150%);
+    backdrop-filter: blur(14px) saturate(150%);
+  }
+
+  .refresh-button:disabled { cursor: wait; opacity: 0.65; }
+
+  .refresh-button.is-loading .icon { animation: spin 0.8s linear infinite; }
+
+  /* ── Error ────────────────────────────────────────────────── */
+  .error-banner {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0 0 18px;
+    padding: 12px 16px;
+    border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--glass-border));
+    border-radius: var(--radius-lg);
+    background: linear-gradient(165deg, var(--danger-wash), color-mix(in srgb, var(--danger-wash) 50%, transparent));
+    box-shadow: 0 1px 0 var(--sheen) inset, 0 10px 24px -18px rgba(120, 40, 30, 0.45);
+    color: var(--danger);
+    font-size: 12.5px;
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
+
+  .error-banner .icon { width: 15px; height: 15px; }
+
+  .error-banner p { margin: 0; }
+
+  .error-banner button {
+    margin-left: auto;
+    padding: 1px 0;
+    border-bottom: 1px solid currentColor;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  /* ── Session ledger ───────────────────────────────────────── */
+  .column-head {
+    display: grid;
+    grid-template-columns: var(--date-col) minmax(0, 1fr) var(--figures-col) 28px;
+    gap: 20px;
+    padding: 0 18px 10px;
+    color: var(--faint);
+    font-size: 10.5px;
+  }
+
+  .column-usage { text-align: right; }
+
+  .session-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .session-list.is-busy {
+    pointer-events: none;
+    opacity: 0.55;
+  }
+
+  .session {
+    position: relative;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-xl);
+    background: linear-gradient(155deg, var(--glass-top), var(--glass-bottom));
+    box-shadow: var(--glass-shadow), 0 1px 0 var(--sheen) inset;
+    overflow: hidden;
+    -webkit-backdrop-filter: var(--blur);
+    backdrop-filter: var(--blur);
+    transition: border-color 0.22s ease, box-shadow 0.22s ease;
+  }
+
+  .session::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 14%;
+    left: 14%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--sheen), transparent);
+    pointer-events: none;
+  }
+
+  .session:hover {
+    border-color: color-mix(in srgb, var(--accent) 22%, var(--glass-border));
+    box-shadow: 0 26px 50px -26px rgba(24, 62, 96, 0.42), 0 1px 0 var(--sheen) inset;
+  }
+
+  .session.is-open {
+    border-color: color-mix(in srgb, var(--accent) 30%, var(--glass-border));
+    box-shadow: 0 30px 60px -30px rgba(24, 62, 96, 0.48), 0 1px 0 var(--sheen) inset;
+  }
+
+  .session-summary {
+    display: grid;
+    grid-template-columns: var(--date-col) minmax(0, 1fr) var(--figures-col) 28px;
+    align-items: center;
+    gap: 20px;
+    padding: 18px;
+    cursor: pointer;
+    border-radius: var(--radius-xl);
+    transition: background-color 0.18s ease;
+  }
+
+  .session-summary:hover,
+  .session.is-open .session-summary { background: var(--surface-soft); }
+
+  .session-date {
+    display: flex;
+    align-items: center;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
     line-height: 1.35;
+    white-space: nowrap;
   }
 
-  /* Session ID row */
-  .session-id-row {
+  .date-primary {
+    color: var(--ink-soft);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .session-main { min-width: 0; }
+
+  .session-title {
+    margin: 0 0 5px;
+    overflow: hidden;
+    color: var(--ink);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .session.is-open .session-title {
+    white-space: normal;
+  }
+
+  .session-id-line {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .session-id {
+    max-width: 350px;
+    overflow: hidden;
+    color: var(--faint);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.01em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .session-path-line {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+    margin-top: 1px;
+  }
+
+  .session-path-line > .icon {
+    width: 13px;
+    height: 13px;
+    flex: none;
+    margin-right: 2px;
+    color: var(--faint);
+  }
+
+  .session-path {
+    max-width: 440px;
+    overflow: hidden;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mini-button {
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    border-radius: 7px;
+    color: var(--faint);
+    opacity: 0.75;
+    transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .mini-button .icon { width: 13px; height: 13px; }
+
+  .session-summary:hover .mini-button,
+  .mini-button:focus-visible { opacity: 1; }
+
+  .mini-button:hover {
+    background: var(--accent-wash);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent) inset;
+    color: var(--accent);
+  }
+
+  .mini-button.is-success {
+    color: var(--positive);
+    opacity: 1;
+  }
+
+  .mini-button.is-error {
+    color: var(--danger);
+    opacity: 1;
+  }
+
+  .mini-button.is-loading {
+    color: var(--accent);
+    opacity: 1;
+  }
+
+  .mini-spinner {
+    width: 13px;
+    height: 13px;
+    display: block;
+    flex: none;
+    color: var(--accent);
+    transform-origin: 50% 50%;
+    animation: spin 0.75s linear infinite;
+  }
+
+  .session-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    min-width: 0;
+    margin-top: 7px;
+    color: var(--muted);
+    font-size: 11.5px;
+  }
+
+  .meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+  }
+
+  .meta-item .icon {
+    width: 13px;
+    height: 13px;
+    color: var(--faint);
+  }
+
+  .meta-date { display: none; }
+
+  .meta-key {
+    color: var(--faint);
+    font-size: 10.5px;
+  }
+
+  .meta-agent,
+  .meta-model {
+    color: var(--ink-soft);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+  }
+
+  .session-figures {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    width: 100%;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .figure {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+    min-width: 0;
+    text-align: right;
+  }
+
+  .figure-value {
+    overflow: hidden;
+    max-width: 100%;
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    font-weight: 500;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .figure-label {
+    color: var(--faint);
+    font-size: 10px;
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+
+  .figure-cache .figure-value { color: var(--positive); }
+
+  .figure-empty .figure-value {
+    color: var(--faint);
+    font-weight: 400;
+  }
+
+  .session-chevron {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    color: var(--faint);
+    transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.22s ease, box-shadow 0.18s ease;
+  }
+
+  .session-chevron .icon { width: 15px; height: 15px; }
+
+  .session-summary:hover .session-chevron { color: var(--ink-soft); }
+
+  .session-chevron:hover {
+    border-color: var(--glass-border);
+    background: var(--surface);
+    box-shadow: 0 1px 0 var(--sheen) inset;
+    color: var(--ink);
+  }
+
+  .session.is-open .session-chevron {
+    border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+    background: var(--accent-wash);
+    box-shadow: 0 0 18px -4px var(--accent-glow);
+    transform: rotate(180deg);
+    color: var(--accent);
+  }
+
+  /* ── Expanded detail ──────────────────────────────────────── */
+  .session-detail {
+    display: grid;
+    grid-template-rows: 0fr;
+    border-top: 1px solid transparent;
+    background: linear-gradient(180deg, var(--surface-soft), transparent 70%);
+    transition:
+      grid-template-rows 0.34s cubic-bezier(0.22, 0.7, 0.3, 1),
+      border-color 0.3s ease,
+      box-shadow 0.3s ease;
+  }
+
+  .session.is-open .session-detail {
+    grid-template-rows: 1fr;
+    border-top-color: var(--glass-edge);
+    box-shadow: 0 1px 0 var(--sheen) inset;
+  }
+
+  .session-detail-clip {
+    min-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(-5px);
+    transition: opacity 0.2s ease, transform 0.34s cubic-bezier(0.22, 0.7, 0.3, 1);
+  }
+
+  .session.is-open .session-detail-clip {
+    opacity: 1;
+    transform: none;
+    transition: opacity 0.28s ease 0.04s, transform 0.36s cubic-bezier(0.22, 0.7, 0.3, 1);
+  }
+
+  .session-usage {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 16px;
+    margin: 0 18px;
+    padding: 14px 0 14px calc(var(--date-col) + 20px);
+    border-bottom: 1px solid var(--glass-edge);
+  }
+
+  .usage-item { min-width: 0; }
+
+  .usage-label {
+    display: block;
+    overflow: hidden;
+    color: var(--faint);
+    font-size: 10px;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .usage-value {
+    display: block;
+    overflow: hidden;
+    margin-top: 2px;
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .usage-item.is-hit .usage-value { color: var(--positive); }
+
+  .detail-inner {
+    display: grid;
+    grid-template-columns: var(--date-col) minmax(0, 1fr);
+    gap: 20px;
+    padding: 16px 18px 22px;
+  }
+
+  .detail-label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-top: 1px;
+    color: var(--faint);
+    font-size: 10.5px;
+    line-height: 1.4;
+  }
+
+  .detail-count {
+    color: var(--faint);
+    font-family: var(--font-mono);
+    font-size: 10px;
+  }
+
+  .detail-main { min-width: 0; }
+
+  .message {
+    padding-bottom: 14px;
+  }
+
+  .message + .message {
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+
+  .message-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+
+  .message-time {
+    color: var(--faint);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .message-agent {
+    color: var(--muted);
+    font-size: 10.5px;
+  }
+
+  .message-text {
+    max-width: 78ch;
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 13px;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+
+  .empty-inline,
+  .inline-error,
+  .loading-inline {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 0.72rem;
-    color: var(--text-muted);
-    margin-bottom: 3px;
-    font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', 'Monaco', monospace;
-  }
-  .session-id-row .sid {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 340px;
-    color: var(--text-secondary);
-  }
-  .copy-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 2px 8px;
-    border-radius: 4px;
-    border: 1px solid var(--border);
-    background: transparent;
-    color: var(--text-muted);
-    font-size: 0.68rem;
-    cursor: pointer;
-    transition: var(--transition);
-    font-family: inherit;
-    white-space: nowrap;
-    vertical-align: middle;
-  }
-  .copy-btn:hover {
-    border-color: var(--copper);
-    color: var(--copper);
-    background: var(--copper-dim);
-  }
-  .copy-btn.copied {
-    border-color: var(--cache-hit);
-    color: var(--cache-hit);
-    background: var(--cache-hit-dim);
+    color: var(--muted);
+    font-size: 12.5px;
   }
 
-  /* Session meta */
-  .session-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px 16px;
-    font-size: 0.76rem;
-    color: var(--text-muted);
-    margin-top: 8px;
-  }
-  .session-meta span {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    white-space: nowrap;
-  }
-  .session-meta .dir {
-    max-width: 280px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .inline-error { color: var(--danger); }
+
+  .inline-error .text-button { margin-left: 4px; }
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    border: 1.5px solid var(--line-strong);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
   }
 
-  .badge {
-    display: inline-flex;
+  .loading-state {
+    min-height: 260px;
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 3px;
-    padding: 2px 9px;
-    border-radius: 10px;
-    font-size: 0.7rem;
+    justify-content: center;
+    gap: 12px;
+    color: var(--muted);
+    font-size: 12.5px;
+  }
+
+  .loading-state .spinner { width: 18px; height: 18px; }
+
+  /* ── Empty state ──────────────────────────────────────────── */
+  .empty-state {
+    max-width: 540px;
+    padding: 56px 32px;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-xl);
+    background: linear-gradient(155deg, var(--glass-top), var(--glass-bottom));
+    box-shadow: var(--glass-shadow), 0 1px 0 var(--sheen) inset;
+    -webkit-backdrop-filter: var(--blur);
+    backdrop-filter: var(--blur);
+  }
+
+  .empty-title {
+    margin: 0 0 6px;
+    color: var(--ink);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .empty-copy {
+    margin: 0 0 18px;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.65;
+  }
+
+  .text-button {
+    padding-bottom: 2px;
+    border-bottom: 1px solid currentColor;
+    color: var(--accent);
+    font-size: 12.5px;
     font-weight: 500;
-    background: transparent;
-    border: 1px solid var(--border);
-    white-space: nowrap;
-    letter-spacing: 0.01em;
-  }
-  .badge-agent { color: var(--purple); border-color: rgba(198,120,221,0.3); background: var(--purple-dim); }
-  .badge-model { color: var(--blue); border-color: rgba(97,175,239,0.25); background: var(--blue-dim); }
-  .badge-cost { color: var(--cost); border-color: rgba(224,108,117,0.25); background: var(--cost-dim); }
-
-  .session-toggle {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    transition: transform var(--transition), color var(--transition);
-    flex-shrink: 0;
-    margin-top: 3px;
-    width: 22px; text-align: center;
-    font-family: monospace;
-  }
-  .session-card.open .session-toggle { transform: rotate(180deg); color: var(--copper); }
-
-  /* ── Token Stats Bar ── */
-  .token-stats {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0 16px;
-    margin-top: 10px;
-    padding: 10px 14px;
-    background: var(--ink-700);
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-  }
-  .token-total {
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: var(--text);
-    display: flex;
-    align-items: baseline;
-    gap: 5px;
-    font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
-  }
-  .token-total .val { color: var(--blue); font-size: 1.15rem; }
-  .token-total .unit { font-size: 0.65rem; color: var(--text-muted); font-weight: 500; font-family: 'Inter', sans-serif; }
-  .token-item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
-  }
-  .token-item .val { font-weight: 600; font-size: 0.75rem; }
-  .token-item .lbl { font-family: 'Inter', sans-serif; font-size: 0.66rem; color: var(--text-muted); }
-  .token-in .val { color: #a5d6ff; }
-  .token-out .val { color: #ffcc80; }
-  .token-cache-hit .val { color: var(--cache-hit); }
-  .token-cache-miss .val { color: var(--cache-miss); }
-  .token-ratio {
-    display: flex; align-items: center; gap: 4px;
-  }
-  .token-ratio .lbl { font-size: 0.66rem; color: var(--text-muted); font-family: 'Inter', sans-serif; }
-  .token-ratio .val {
-    font-weight: 700;
-    color: var(--cache-hit);
-    font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
-    font-size: 0.78rem;
-  }
-  .token-divider {
-    width: 1px;
-    height: 18px;
-    background: var(--border);
   }
 
-  /* ── Session Body (expandable) ── */
-  .session-body {
-    display: none;
-    border-top: 1px solid var(--border);
-    padding: 16px 18px;
-    background: var(--ink-900);
-  }
-  .session-card.open .session-body { display: block; }
+  .text-button:hover { color: var(--accent-strong); }
 
-  .session-body h4 {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
-  /* ── User Messages List ── */
-  .msg-list { list-style: none; }
-  .msg-item {
-    padding: 10px 14px;
-    background: var(--ink-800);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    margin-bottom: 7px;
-    font-size: 0.84rem;
-    color: var(--text);
-    word-break: break-word;
-    line-height: 1.5;
-  }
-  .msg-item .msg-time {
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    margin-bottom: 3px;
-    font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
-  }
-  .msg-item .msg-agent {
-    font-size: 0.7rem;
-    color: var(--purple);
-    margin-bottom: 2px;
-  }
-  .no-msgs {
-    color: var(--text-muted);
-    font-size: 0.84rem;
-    font-style: italic;
-  }
-  .msg-number {
-    display: inline-block;
-    color: var(--copper);
-    font-weight: 600;
-    margin-right: 6px;
-    font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
-    font-size: 0.7rem;
-  }
-
-  /* ── Pagination ── */
+  /* ── Pagination ───────────────────────────────────────────── */
   .pagination {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    margin-top: 22px;
-    flex-wrap: wrap;
+    gap: 16px;
+    padding: 26px 0 8px;
   }
-  .pagination button {
-    min-width: 36px;
-    text-align: center;
-    padding: 7px 11px;
-    font-size: 0.82rem;
+
+  .page-numbers {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .page-btn {
+    min-width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 10px;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .page-btn:hover {
+    border-color: var(--glass-border);
+    background: var(--surface);
+    box-shadow: 0 1px 0 var(--sheen) inset;
+    color: var(--ink);
+  }
+
+  .page-btn.is-active {
+    border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+    background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 78%, #ffffff), var(--accent));
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.45) inset, 0 8px 20px -10px var(--accent-glow);
+    color: #ffffff;
     font-weight: 500;
   }
-  .pagination button.active {
-    background: var(--copper);
-    color: #14181f;
-    border-color: var(--copper);
-    font-weight: 700;
+
+  .page-btn.is-active:hover {
+    border-color: color-mix(in srgb, var(--accent) 80%, transparent);
+    background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 82%, #ffffff), var(--accent));
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.45) inset, 0 8px 22px -10px var(--accent-glow);
+    color: #ffffff;
   }
-  .pagination button:disabled {
+
+  [data-theme="dark"] .page-btn.is-active,
+  [data-theme="dark"] .page-btn.is-active:hover { color: #07131e; }
+
+  .page-btn:disabled {
+    cursor: default;
     opacity: 0.3;
-    cursor: not-allowed;
-    pointer-events: none;
-  }
-  .pagination .ellipsis {
-    color: var(--text-muted);
-    padding: 0 2px;
-    font-weight: 600;
-  }
-  .pagination-info {
-    font-size: 0.78rem;
-    color: var(--text-muted);
-    margin-left: 6px;
   }
 
-  /* ── Footer ── */
-  .footer {
+  .page-btn:disabled:hover {
+    border-color: transparent;
+    background: none;
+    color: var(--muted);
+  }
+
+  .page-btn .icon { width: 14px; height: 14px; }
+
+  .page-ellipsis {
+    min-width: 22px;
+    color: var(--faint);
+    font-family: var(--font-mono);
+    font-size: 11px;
     text-align: center;
-    padding: 16px;
-    color: var(--text-muted);
-    font-size: 0.72rem;
-    border-top: 1px solid var(--border);
-    margin-top: 36px;
-    letter-spacing: 0.02em;
   }
 
-  /* ── Responsive ── */
-  @media (max-width: 768px) {
-    .container { padding: 12px 14px; }
-    .header { padding: 10px 14px; }
-    .header h1 { font-size: 1rem; }
-    .session-header { padding: 12px 14px; }
-    .session-meta { gap: 4px 10px; }
-    .session-meta .dir { max-width: 160px; }
-    .controls { gap: 6px; padding: 10px 12px; }
-    .search-box { max-width: none; }
-    .token-stats { gap: 4px 10px; padding: 8px 10px; }
-    .token-total { font-size: 0.9rem; }
+  .pagination-info {
+    color: var(--faint);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    white-space: nowrap;
   }
+
+  /* ── Toast ────────────────────────────────────────────────── */
+  .toast {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 50;
+    max-width: min(440px, calc(100vw - 32px));
+    padding: 12px 16px;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(160deg, var(--glass-top), var(--glass-bottom));
+    box-shadow: var(--glass-shadow), 0 1px 0 var(--sheen) inset;
+    color: var(--ink);
+    font-size: 12.5px;
+    line-height: 1.55;
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    backdrop-filter: blur(20px) saturate(160%);
+  }
+
+  .toast.is-error {
+    border-color: color-mix(in srgb, var(--danger) 30%, var(--glass-border));
+    color: var(--danger);
+  }
+
+  /* ── Motion ───────────────────────────────────────────────── */
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @keyframes drift {
+    0% { transform: translate3d(-1.5%, -1%, 0) scale(1); }
+    50% { transform: translate3d(1.5%, 1.5%, 0) scale(1.04); }
+    100% { transform: translate3d(-1%, 2%, 0) scale(1.01); }
+  }
+
+  /* ── Responsive ───────────────────────────────────────────── */
+  @media (pointer: coarse) {
+    .mini-button {
+      width: 30px;
+      height: 30px;
+      opacity: 0.8;
+    }
+
+    .session-chevron {
+      width: 28px;
+      height: 28px;
+    }
+  }
+
+  @media (max-width: 1000px) {
+    .column-head,
+    .session-summary {
+      grid-template-columns: minmax(0, 1fr) 210px 28px;
+    }
+
+    .column-time,
+    .session-date { display: none; }
+
+    .meta-date { display: inline-flex; }
+
+    .column-head .column-session { display: none; }
+
+    .session-usage { padding-left: 0; }
+
+    .detail-inner { grid-template-columns: 1fr; }
+    .detail-label { display: none; }
+  }
+
+  @media (max-width: 760px) {
+    .header-inner,
+    .page {
+      padding-right: 20px;
+      padding-left: 20px;
+    }
+
+    .index-bar {
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .search-field {
+      flex-basis: 100%;
+      max-width: none;
+    }
+
+    .controls {
+      width: 100%;
+      margin-left: 0;
+    }
+
+    .refresh-button { margin-left: auto; }
+
+    .header-query { display: none; }
+
+    .column-head { display: none; }
+
+    .session-summary {
+      grid-template-columns: minmax(0, 1fr) 200px 28px;
+      padding-top: 16px;
+      padding-bottom: 16px;
+    }
+
+    .session-id { max-width: 46vw; }
+    .session-path { max-width: 42vw; }
+  }
+
+  @media (max-width: 620px) {
+    .page {
+      padding-top: 18px;
+      padding-bottom: 20px;
+    }
+
+    .brand-divider,
+    .brand-source { display: none; }
+
+    .header-stats .header-page { display: none; }
+
+    .session-summary {
+      grid-template-columns: minmax(0, 1fr) 28px;
+      grid-template-areas:
+        "main chevron"
+        "figures figures";
+      gap: 12px;
+      padding: 16px 14px;
+    }
+
+    .session-main { grid-area: main; }
+    .session-chevron { grid-area: chevron; align-self: start; margin-top: -2px; }
+
+    .session-figures {
+      grid-area: figures;
+      grid-template-columns: repeat(3, minmax(0, auto));
+      justify-content: start;
+      gap: 26px;
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+    }
+
+    .figure { align-items: flex-start; text-align: left; }
+
+    .session-title {
+      display: -webkit-box;
+      overflow: hidden;
+      white-space: normal;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
+
+    .session-id { max-width: 54vw; }
+    .session-path { max-width: 52vw; }
+
+    .session-usage {
+      gap: 8px;
+      margin: 0 14px;
+      padding-top: 12px;
+      padding-bottom: 12px;
+    }
+
+    .detail-inner { padding-right: 14px; padding-left: 14px; }
+
+    .pagination {
+      gap: 8px;
+      justify-content: space-between;
+      padding-top: 20px;
+    }
+
+    .page-numbers { display: none; }
+
+    .pagination-info {
+      order: 2;
+      margin-left: auto;
+    }
+
+    .empty-state { padding-top: 44px; padding-bottom: 44px; }
+
+    .toast {
+      right: 16px;
+      bottom: 16px;
+      left: 16px;
+      max-width: none;
+    }
+  }
+
+  @media (max-width: 430px) {
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 8px;
+    }
+
+    .select-control { justify-content: space-between; }
+    .refresh-button { margin-left: 0; }
+
+    .header-tail { gap: 10px; }
+    .header-stats { gap: 8px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
 </style>
 </head>
 <body>
+<svg class="svg-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <symbol id="icon-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></symbol>
+  <symbol id="icon-x" viewBox="0 0 16 16"><path d="m4 4 8 8M12 4l-8 8"/></symbol>
+  <symbol id="icon-copy" viewBox="0 0 16 16"><rect x="5.5" y="5.5" width="8" height="8" rx="1"/><path d="M3.5 10.5h-1a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v1"/></symbol>
+  <symbol id="icon-download" viewBox="0 0 16 16"><path d="M8 2.5v7"/><path d="m5 6.5 3 3 3-3"/><path d="M3 13.5h10"/></symbol>
+  <symbol id="icon-refresh" viewBox="0 0 16 16"><path d="M14 8a6 6 0 1 1-6-6c1.68 0 3.29.67 4.49 1.83L14 5.33"/><path d="M14 2v3.33h-3.33"/></symbol>
+  <symbol id="icon-sun" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.8"/><path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M12.6 3.4l-.7.7M4.1 11.9l-.7.7"/></symbol>
+  <symbol id="icon-moon" viewBox="0 0 16 16"><path d="M13.2 9.6A5.5 5.5 0 0 1 6.4 2.8 5.5 5.5 0 1 0 13.2 9.6Z"/></symbol>
+  <symbol id="icon-chevron" viewBox="0 0 16 16"><path d="m4 6 4 4 4-4"/></symbol>
+  <symbol id="icon-folder" viewBox="0 0 16 16"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.2l1.3 1.5h5.5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5Z"/></symbol>
+  <symbol id="icon-open" viewBox="0 0 16 16"><path d="M9 3h4v4"/><path d="m13 3-5.5 5.5"/><path d="M11.5 9.5v2A1.5 1.5 0 0 1 10 13H4a1.5 1.5 0 0 1-1.5-1.5v-6A1.5 1.5 0 0 1 4 4h2"/></symbol>
+  <symbol id="icon-chat" viewBox="0 0 16 16"><path d="M13.5 8A5.5 5.5 0 0 1 8 13.5H3.5l1.3-2A5.5 5.5 0 1 1 13.5 8Z"/></symbol>
+  <symbol id="icon-alert" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5"/><path d="M8 4.5v4"/><path d="M8 11.2h.01"/></symbol>
+  <symbol id="icon-check" viewBox="0 0 16 16"><path d="m3 8.5 3 3 7-7"/></symbol>
+  <symbol id="icon-arrow-left" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></symbol>
+  <symbol id="icon-arrow-right" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></symbol>
+</svg>
 
-<div class="header">
+<header class="site-header">
   <div class="header-inner">
-    <div class="header-brand">
-      <div class="header-logo">▸</div>
-      <h1>OpenCode Session Viewer</h1>
+    <a class="brand" href="/" aria-label="OpenCode Sessions 首页">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">OpenCode Sessions</span>
+      <span class="brand-divider" aria-hidden="true"></span>
+      <span class="brand-source">opencode.db</span>
+    </a>
+    <div class="header-tail">
+      <p class="header-stats" id="headerStats"><span>正在读取会话</span></p>
+      <button class="icon-button theme-toggle" type="button" id="themeToggle" title="切换主题" aria-label="切换主题">
+        <svg class="icon icon-moon" aria-hidden="true"><use href="#icon-moon"></use></svg>
+        <svg class="icon icon-sun" aria-hidden="true"><use href="#icon-sun"></use></svg>
+      </button>
     </div>
-    <div style="display:flex;align-items:center;gap:14px;">
-      <button id="themeToggle" onclick="toggleTheme()" title="切换主题" class="theme-btn">🌙</button>
-      <div class="header-stats" id="headerStats">加载中...</div>
+  </div>
+</header>
+
+<main class="page">
+  <h1 class="visually-hidden">OpenCode 会话浏览</h1>
+
+  <section class="index-bar" aria-label="搜索与筛选会话">
+    <div class="search-field">
+      <svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg>
+      <label class="visually-hidden" for="searchInput">搜索会话</label>
+      <input type="text" id="searchInput" placeholder="搜索会话 ID 或标题" autocomplete="off" spellcheck="false">
+      <button class="clear-search" type="button" id="clearSearch" title="清除搜索" aria-label="清除搜索" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#icon-x"></use></svg>
+      </button>
+    </div>
+    <div class="controls">
+      <label class="select-control" for="sortOrder">
+        <span>排序</span>
+        <span class="select-shell">
+          <select id="sortOrder">
+            <option value="desc" selected>最新在前</option>
+            <option value="asc">最早在前</option>
+            <option value="user_msg_desc">输入最多</option>
+            <option value="user_msg_asc">输入最少</option>
+          </select>
+          <svg class="icon" aria-hidden="true"><use href="#icon-chevron"></use></svg>
+        </span>
+      </label>
+      <label class="select-control" for="pageSize">
+        <span>每页</span>
+        <span class="select-shell">
+          <select id="pageSize">
+            <option value="10">10</option>
+            <option value="20" selected>20</option>
+            <option value="50">50</option>
+          </select>
+          <svg class="icon" aria-hidden="true"><use href="#icon-chevron"></use></svg>
+        </span>
+      </label>
+      <button class="icon-button refresh-button" type="button" id="refreshBtn" title="刷新会话" aria-label="刷新会话">
+        <svg class="icon" aria-hidden="true"><use href="#icon-refresh"></use></svg>
+      </button>
+    </div>
+  </section>
+
+  <div class="error-banner" id="error" role="alert" hidden>
+    <svg class="icon" aria-hidden="true"><use href="#icon-alert"></use></svg>
+    <p id="errorText"></p>
+    <button type="button" id="retryBtn">重试</button>
+  </div>
+
+  <div class="column-head" aria-hidden="true">
+    <span class="column-time">时间</span>
+    <span class="column-session">会话</span>
+    <span class="column-usage">用量</span>
+    <span></span>
+  </div>
+
+  <div class="session-list" id="sessionList" role="region" aria-label="会话列表" aria-busy="true">
+    <div class="loading-state">
+      <span class="spinner" aria-hidden="true"></span>
+      <span>正在读取会话</span>
     </div>
   </div>
-</div>
 
-<div class="container">
-  <!-- Controls -->
-  <div class="controls">
-    <input type="text" id="searchInput" class="search-box" placeholder="搜索 Session ID 或标题..." oninput="onSearch()" />
-    <label for="pageSize">每页</label>
-    <select id="pageSize" onchange="changePageSize()">
-      <option value="10">10</option>
-      <option value="20" selected>20</option>
-      <option value="50">50</option>
-    </select>
-    <label for="sortOrder">排序</label>
-    <select id="sortOrder" onchange="changeSort()">
-      <option value="desc" selected>最新在前</option>
-      <option value="asc">最早在前</option>
-      <option value="user_msg_desc">💬 输入最多</option>
-      <option value="user_msg_asc">💬 输入最少</option>
-    </select>
-    <button onclick="refreshSessions()" title="刷新">🔄</button>
-  </div>
+  <nav class="pagination" id="pagination" aria-label="会话分页" hidden></nav>
+</main>
 
-  <!-- Loading -->
-  <div class="loading" id="loading">
-    <div class="spinner"></div>
-    <div>正在加载会话数据...</div>
-  </div>
-
-  <!-- Error -->
-  <div class="error" id="error" style="display:none;"></div>
-
-  <!-- Session List -->
-  <div id="sessionList"></div>
-
-  <!-- Pagination -->
-  <div class="pagination" id="pagination"></div>
-
-  <div class="footer">
-    OpenCode Session Viewer · 数据来源: opencode.db
-  </div>
-</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script>
-// ─── Theme ───────────────────────────────────────────────────
-(function initTheme() {
-  const saved = localStorage.getItem('opencode-theme') || 'dark';
-  document.documentElement.setAttribute('data-theme', saved);
-  updateThemeIcon(saved);
-})();
+const $ = (id) => document.getElementById(id);
 
-function toggleTheme() {
-  const current = document.documentElement.getAttribute('data-theme');
-  const next = current === 'light' ? 'dark' : 'light';
-  document.documentElement.setAttribute('data-theme', next);
-  localStorage.setItem('opencode-theme', next);
-  updateThemeIcon(next);
+function icon(name) {
+  return `<svg class="icon" aria-hidden="true"><use href="#icon-${name}"></use></svg>`;
 }
 
-function updateThemeIcon(theme) {
-  const btn = document.getElementById('themeToggle');
-  if (btn) btn.textContent = theme === 'light' ? '☀️' : '🌙';
+function escapeHtml(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character]);
+}
+
+// ─── Theme ───────────────────────────────────────────────────
+function syncThemeControl() {
+  const theme = document.documentElement.dataset.theme;
+  const button = $('themeToggle');
+  if (!button) return;
+  const next = theme === 'dark' ? '浅色' : '深色';
+  button.title = `切换到${next}主题`;
+  button.setAttribute('aria-label', `切换到${next}主题`);
+}
+
+function toggleTheme() {
+  const current = document.documentElement.dataset.theme;
+  const next = current === 'light' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = next;
+  try {
+    localStorage.setItem('opencode-theme', next);
+  } catch (error) {
+    // Local storage can be unavailable in hardened browser contexts.
+  }
+  syncThemeControl();
 }
 
 // ─── State ───────────────────────────────────────────────────
@@ -658,383 +1504,675 @@ const state = {
   totalPages: 0,
   sessions: [],
   expandedSessions: new Set(),
-  sessionMessages: {},  // cache: sessionId -> messages[]
+  pendingSessions: new Set(),
+  sessionMessages: {},
   searchTimer: null,
 };
 
+let loadSequence = 0;
+
 // ─── API ─────────────────────────────────────────────────────
 async function api(path) {
-  const res = await fetch(path);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-    throw new Error(err.error || `HTTP ${res.status}`);
+  const response = await fetch(path);
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+    throw new Error(error.error || `HTTP ${response.status}`);
   }
-  return res.json();
+  return response.json();
+}
+
+// ─── Loading ─────────────────────────────────────────────────
+function loadingMarkup() {
+  return `<div class="loading-state"><span class="spinner" aria-hidden="true"></span><span>正在读取会话</span></div>`;
+}
+
+function inlineLoadingMarkup() {
+  return `<div class="loading-inline"><span class="spinner" aria-hidden="true"></span><span>正在读取输入</span></div>`;
+}
+
+function setBusy(busy) {
+  const refresh = $('refreshBtn');
+  const list = $('sessionList');
+  refresh.classList.toggle('is-loading', busy);
+  refresh.disabled = busy;
+  list.setAttribute('aria-busy', String(busy));
+}
+
+function showError(message) {
+  $('errorText').textContent = message;
+  $('error').hidden = false;
+}
+
+function hideError() {
+  $('error').hidden = true;
+}
+
+let toastTimer = null;
+
+function showToast(message, type) {
+  const toast = $('toast');
+  clearTimeout(toastTimer);
+  toast.textContent = message;
+  toast.classList.toggle('is-error', type === 'error');
+  toast.hidden = false;
+  toastTimer = setTimeout(() => {
+    toast.hidden = true;
+  }, type === 'error' ? 6000 : 3200);
 }
 
 async function loadSessions() {
-  const loading = document.getElementById('loading');
-  const error = document.getElementById('error');
-  loading.style.display = 'block';
-  error.style.display = 'none';
-  document.getElementById('sessionList').innerHTML = '';
+  const sequence = ++loadSequence;
+  const list = $('sessionList');
+  hideError();
+  setBusy(true);
+
+  if (state.sessions.length === 0) {
+    list.innerHTML = loadingMarkup();
+  } else {
+    list.classList.add('is-busy');
+  }
 
   try {
-    const q = state.query ? `&q=${encodeURIComponent(state.query)}` : '';
-    const data = await api(`/api/sessions?page=${state.page}&limit=${state.limit}&sort=${state.sort}${q}`);
-    state.sessions = data.sessions;
-    state.total = data.total;
-    state.totalPages = data.total_pages;
+    const query = state.query ? `&q=${encodeURIComponent(state.query)}` : '';
+    const data = await api(`/api/sessions?page=${state.page}&limit=${state.limit}&sort=${state.sort}${query}`);
+    if (sequence !== loadSequence) return;
+
+    state.sessions = Array.isArray(data.sessions) ? data.sessions : [];
+    state.total = data.total || 0;
+    state.totalPages = Math.max(1, data.total_pages || 1);
     state.expandedSessions.clear();
+    state.pendingSessions.clear();
     state.sessionMessages = {};
 
-    const searchInfo = state.query ? ` 搜索 "<span>${escapeHtml(state.query)}</span>"` : '';
-    document.getElementById('headerStats').innerHTML =
-      `共 <span>${data.total}</span> 个会话${searchInfo}，第 <span>${data.page}</span> / <span>${data.total_pages}</span> 页`;
-
+    renderHeader(data);
     renderSessions();
     renderPagination();
-  } catch (e) {
-    error.textContent = '加载失败: ' + e.message;
-    error.style.display = 'block';
+  } catch (error) {
+    if (sequence !== loadSequence) return;
+    showError(`无法读取会话：${error.message}`);
+    if (state.sessions.length === 0) list.innerHTML = '';
   } finally {
-    loading.style.display = 'none';
+    if (sequence === loadSequence) {
+      setBusy(false);
+      list.classList.remove('is-busy');
+    }
   }
 }
 
-// ─── Render ──────────────────────────────────────────────────
-function formatTime(ms) {
-  if (!ms) return '-';
-  const d = new Date(ms);
-  const pad = n => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+// ─── Formatting ──────────────────────────────────────────────
+function timeParts(value) {
+  if (!value) return { date: '—', time: '', full: '—', iso: '' };
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return { date: '—', time: '', full: '—', iso: '' };
+  const pad = (number) => String(number).padStart(2, '0');
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  return {
+    date: `${year}.${month}.${day}`,
+    time: `${hours}:${minutes}`,
+    full: `${year}-${month}-${day} ${hours}:${minutes}`,
+    iso: date.toISOString(),
+  };
 }
 
-function formatCost(c) {
-  if (c == null || c === 0) return null;
-  return '$' + Number(c).toFixed(4);
+function formatNum(value) {
+  const number = Number(value) || 0;
+  if (number >= 1000000) return `${(number / 1000000).toFixed(1)}M`;
+  if (number >= 1000) return `${(number / 1000).toFixed(1)}k`;
+  return String(number);
 }
 
-function formatTokens(input, output) {
-  const parts = [];
-  if (input) parts.push(`入:${(input/1000).toFixed(1)}k`);
-  if (output) parts.push(`出:${(output/1000).toFixed(1)}k`);
-  return parts.join(' ');
+function formatCost(value) {
+  if (value == null || Number(value) === 0) return null;
+  return `$${Number(value).toFixed(4)}`;
 }
 
-function formatNum(n) {
-  if (n == null || n === 0) return '0';
-  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-  if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
-  return String(n);
+function renderHeader(data) {
+  const search = state.query
+    ? `<span class="header-query" title="搜索：${escapeHtml(state.query)}">搜索 “${escapeHtml(state.query)}”</span>`
+    : '';
+  $('headerStats').innerHTML = `
+    <span>共 <strong>${data.total}</strong> 个会话</span>
+    ${search}
+    <span class="header-page">第 ${data.page} / ${data.total_pages} 页</span>`;
 }
 
-function buildTokenStats(s) {
-  const total = (s.tokens_input || 0) + (s.tokens_output || 0);
-  const input = s.tokens_input || 0;
-  const output = s.tokens_output || 0;
-  const cacheHit = s.tokens_cache_read || 0;
-  const cacheMiss = s.tokens_cache_write || 0;
-  const cacheTotal = cacheHit + cacheMiss;
-
-  if (total === 0 && cacheTotal === 0) return '';
-
-  let html = '<div class="token-stats">';
-
-  // Total tokens (larger, prominent)
-  html += `<span class="token-total"><span class="val">${formatNum(total)}</span><span class="unit">tokens</span></span>`;
-  html += '<span class="token-divider"></span>';
-
-  // Input / Output
-  html += `<span class="token-item token-in"><span class="lbl">入</span> <span class="val">${formatNum(input)}</span></span>`;
-  html += `<span class="token-item token-out"><span class="lbl">出</span> <span class="val">${formatNum(output)}</span></span>`;
-
-  // Cache info
-  if (cacheTotal > 0) {
-    html += '<span class="token-divider"></span>';
-    html += `<span class="token-item token-cache-hit"><span class="lbl">命中</span> <span class="val">${formatNum(cacheHit)}</span></span>`;
-    html += `<span class="token-item token-cache-miss"><span class="lbl">未命中</span> <span class="val">${formatNum(cacheMiss)}</span></span>`;
-    const totalInput = input + cacheHit + cacheMiss;
-    const ratio = totalInput > 0 ? (cacheHit / totalInput * 100).toFixed(2) : '0.00';
-    html += `<span class="token-ratio"><span class="lbl">命中率</span> <span class="val">${ratio}%</span></span>`;
-  }
-
-  html += '</div>';
-  return html;
+// ─── Rendering ───────────────────────────────────────────────
+function figureMarkup(value, label, className) {
+  return `<span class="figure ${className || ''}">
+    <span class="figure-value">${escapeHtml(value)}</span>
+    <span class="figure-label">${escapeHtml(label)}</span>
+  </span>`;
 }
 
-function truncatePath(p, maxLen) {
-  if (!p) return '-';
-  if (p.length <= maxLen) return escapeHtml(p);
-  return escapeHtml(p.substring(0, maxLen)) + '...';
+function usageItemMarkup(value, label, className) {
+  return `<span class="usage-item ${className || ''}">
+    <span class="usage-label">${escapeHtml(label)}</span>
+    <span class="usage-value">${escapeHtml(value)}</span>
+  </span>`;
 }
 
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+function modelNameFor(session) {
+  if (!session.model) return '';
+  if (typeof session.model === 'string') return session.model;
+  return session.model.variant || session.model.id || session.model.name || session.model.providerID || '';
+}
+
+function emptyMarkup() {
+  const searching = Boolean(state.query);
+  return `<div class="empty-state">
+    <h2 class="empty-title">${searching ? '没有匹配的会话' : '还没有会话记录'}</h2>
+    <p class="empty-copy">${searching
+      ? '换个关键词试试，或清除搜索查看全部会话。'
+      : '使用 OpenCode 开始一次会话后，刷新此页。'}</p>
+    ${searching ? '<button class="text-button" type="button" data-action="clear-search">清除搜索</button>' : ''}
+  </div>`;
 }
 
 function renderSessions() {
-  const list = document.getElementById('sessionList');
+  const list = $('sessionList');
   if (state.sessions.length === 0) {
-    list.innerHTML = '<div class="loading">没有找到会话记录</div>';
+    list.innerHTML = emptyMarkup();
     return;
   }
 
-  list.innerHTML = state.sessions.map((s, i) => {
-    const isOpen = state.expandedSessions.has(s.id);
-    const cost = formatCost(s.cost);
-    const tokens = formatTokens(s.tokens_input, s.tokens_output);
-    const time = formatTime(s.time_created);
-    const updated = formatTime(s.time_updated);
-    const dir = s.directory || s.path || '-';
-    const modelName = s.model ? (s.model.variant || s.model.id || s.model.providerID || '') : '';
-    const agentName = s.agent || '';
-    const userMsgCount = s.user_message_count || 0;
-    const tokenStatsHtml = buildTokenStats(s);
+  list.innerHTML = state.sessions.map((session, index) => {
+    const created = timeParts(session.time_created);
+    const updated = timeParts(session.time_updated);
+    const inputs = Number(session.user_message_count) || 0;
+    const directory = session.directory || session.path || '';
+    const agent = session.agent || '';
+    const model = modelNameFor(session);
+    const isOpen = state.expandedSessions.has(session.id);
 
-    let badges = '';
-    if (agentName) badges += `<span class="badge badge-agent">🤖 ${escapeHtml(agentName)}</span>`;
-    if (modelName) badges += `<span class="badge badge-model">🧠 ${escapeHtml(modelName)}</span>`;
-    if (cost) badges += `<span class="badge badge-cost">💰 ${cost}</span>`;
+    const inputTokens = Number(session.tokens_input) || 0;
+    const outputTokens = Number(session.tokens_output) || 0;
+    const totalTokens = inputTokens + outputTokens;
+    const cacheHit = Number(session.tokens_cache_read) || 0;
+    const cacheMiss = Number(session.tokens_cache_write) || 0;
+    const cacheTotal = cacheHit + cacheMiss;
+    const cacheRatio = cacheTotal > 0
+      ? ((cacheHit / (inputTokens + cacheHit + cacheMiss)) * 100).toFixed(1)
+      : null;
+    const cost = formatCost(session.cost);
+    const title = session.title || '未命名会话';
+    const detailId = `detail-${index}`;
 
-    return `
-      <div class="session-card ${isOpen ? 'open' : ''}" id="card-${i}">
-        <div class="session-header" onclick="toggleSession('${s.id}', ${i})">
-          <div class="session-main">
-            <div class="session-id-row">
-              <span class="sid" title="${escapeHtml(s.id)}">${escapeHtml(s.id)}</span>
-              <button class="copy-btn" onclick="event.stopPropagation(); copySessionId('${escapeHtml(s.id)}', this)" title="复制 Session ID">📋</button>
-              <button class="copy-btn" onclick="event.stopPropagation(); exportSession('${escapeHtml(s.id)}', '${escapeHtml(s.title.replace(/'/g, "\\'"))}', '${escapeHtml(formatTime(s.time_created))}', this)" title="导出为 JSON">📥</button>
-            </div>
-            <div class="session-title">${escapeHtml(s.title)}</div>
-            ${tokenStatsHtml}
-            <div class="session-meta">
-              <span title="${escapeHtml(s.directory || '')}">📁 <span class="dir">${escapeHtml(dir)}</span></span>
-              <span>🕐 创建: ${time}</span>
-              ${updated !== time ? `<span>🔄 更新: ${updated}</span>` : ''}
-              <span>💬 用户输入: ${userMsgCount}</span>
-            </div>
-            ${badges ? `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;">${badges}</div>` : ''}
-          </div>
-          <span class="session-toggle">▼</span>
+    const pathLine = directory
+      ? `<div class="session-path-line">
+          ${icon('folder')}
+          <code class="session-path" title="${escapeHtml(directory)}">${escapeHtml(directory)}</code>
+          <button class="mini-button" type="button" data-action="copy-path" data-index="${index}" title="复制路径" aria-label="复制路径">${icon('copy')}</button>
+          <button class="mini-button" type="button" data-action="open-folder" data-index="${index}" title="打开文件夹" aria-label="打开文件夹">${icon('open')}</button>
+        </div>`
+      : '';
+
+    const meta = [
+      `<span class="meta-item meta-date"><time datetime="${created.iso}">${created.full}</time></span>`,
+    ];
+    if (agent) {
+      meta.push(`<span class="meta-item meta-agent" title="代理"><span class="meta-key">代理</span>${escapeHtml(agent)}</span>`);
+    }
+    if (model) {
+      meta.push(`<span class="meta-item meta-model" title="模型"><span class="meta-key">模型</span>${escapeHtml(model)}</span>`);
+    }
+    meta.push(`<span class="meta-item">${icon('chat')}<span>${inputs} 次输入</span></span>`);
+    if (session.time_updated && updated.full !== created.full) {
+      meta.push(`<span class="meta-item">更新 ${updated.full}</span>`);
+    }
+
+    const tokenFigure = figureMarkup(
+      totalTokens > 0 ? formatNum(totalTokens) : '—',
+      'tokens',
+      totalTokens > 0 ? '' : 'figure-empty',
+    );
+    const cacheFigure = figureMarkup(
+      cacheRatio == null ? '—' : `${cacheRatio}%`,
+      '缓存命中',
+      cacheRatio == null ? 'figure-empty' : 'figure-cache',
+    );
+    const costFigure = figureMarkup(
+      cost || '—',
+      '花费',
+      cost ? '' : 'figure-empty',
+    );
+    const usageHtml = `<div class="session-usage" role="group" aria-label="Token 用量明细">
+      ${usageItemMarkup(formatNum(totalTokens), '总 tokens')}
+      ${usageItemMarkup(formatNum(inputTokens), '输入')}
+      ${usageItemMarkup(formatNum(outputTokens), '输出')}
+      ${usageItemMarkup(formatNum(cacheHit), '缓存命中', cacheHit > 0 ? 'is-hit' : '')}
+      ${usageItemMarkup(formatNum(cacheMiss), '缓存未命中')}
+    </div>`;
+
+    return `<article class="session ${isOpen ? 'is-open' : ''}" data-session-id="${escapeHtml(session.id)}" aria-labelledby="session-title-${index}">
+      <div class="session-summary" data-index="${index}">
+        <div class="session-date">
+          <time class="date-primary" datetime="${created.iso}">${created.full}</time>
         </div>
-        <div class="session-body" id="body-${i}">
-          <h4>📝 最近 ${Math.min(10, userMsgCount)} 次用户输入</h4>
-          <div id="msgs-${i}">
-            <div class="loading" style="padding:20px;"><div class="spinner"></div></div>
+        <div class="session-main">
+          <h2 class="session-title" id="session-title-${index}" title="${escapeHtml(title)}">${escapeHtml(title)}</h2>
+          <div class="session-id-line">
+            <code class="session-id" title="${escapeHtml(session.id)}">${escapeHtml(session.id)}</code>
+            <button class="mini-button" type="button" data-action="copy" data-index="${index}" title="复制会话 ID" aria-label="复制会话 ID">${icon('copy')}</button>
+            <button class="mini-button" type="button" data-action="export" data-index="${index}" title="导出会话 JSON" aria-label="导出会话 JSON">${icon('download')}</button>
+          </div>
+          ${pathLine}
+          <div class="session-meta">${meta.join('')}</div>
+        </div>
+        <div class="session-figures">${tokenFigure}${cacheFigure}${costFigure}</div>
+        <button class="session-chevron" type="button" data-action="toggle" data-index="${index}" aria-expanded="${isOpen}" aria-controls="${detailId}" aria-label="${isOpen ? '收起会话' : '展开会话'}：${escapeHtml(title)}">
+          ${icon('chevron')}
+        </button>
+      </div>
+      <div class="session-detail" id="${detailId}" aria-hidden="${isOpen ? 'false' : 'true'}" ${isOpen ? '' : 'inert'}>
+        <div class="session-detail-clip">
+          ${usageHtml}
+          <div class="detail-inner">
+            <div class="detail-label" aria-hidden="true">
+              <span>用户输入</span>
+              <span class="detail-count">最近 ${Math.min(10, inputs)} 条</span>
+            </div>
+            <div class="detail-main" id="msgs-${index}">
+              ${isOpen ? inlineLoadingMarkup() : ''}
+            </div>
           </div>
         </div>
-      </div>`;
+      </div>
+    </article>`;
+  }).join('');
+}
+
+function renderMessages(index, messages) {
+  const container = $(`msgs-${index}`);
+  if (!container) return;
+
+  if (!messages || messages.length === 0) {
+    container.innerHTML = '<div class="empty-inline">这个会话还没有用户输入。</div>';
+    return;
+  }
+
+  container.innerHTML = messages.map((message) => {
+    const time = timeParts(message.time_created);
+    return `<div class="message">
+      <div class="message-head">
+        <time class="message-time" datetime="${time.iso}">${time.full}</time>
+        ${message.agent ? `<span class="message-agent">${escapeHtml(message.agent)}</span>` : ''}
+      </div>
+      <p class="message-text">${escapeHtml(message.text || '(空输入)')}</p>
+    </div>`;
   }).join('');
 }
 
 function renderPagination() {
-  const pag = document.getElementById('pagination');
+  const pagination = $('pagination');
   if (state.totalPages <= 1) {
-    pag.innerHTML = '';
+    pagination.innerHTML = '';
+    pagination.hidden = true;
     return;
   }
 
   const pages = [];
-  const tp = state.totalPages;
-  const cp = state.page;
+  const totalPages = state.totalPages;
+  const currentPage = state.page;
 
-  // Build page numbers with ellipsis
-  if (tp <= 7) {
-    for (let i = 1; i <= tp; i++) pages.push(i);
+  if (totalPages <= 7) {
+    for (let page = 1; page <= totalPages; page += 1) pages.push(page);
   } else {
     pages.push(1);
-    if (cp > 3) pages.push('...');
-    for (let i = Math.max(2, cp - 1); i <= Math.min(tp - 1, cp + 1); i++) {
-      pages.push(i);
+    if (currentPage > 3) pages.push('...');
+    for (let page = Math.max(2, currentPage - 1); page <= Math.min(totalPages - 1, currentPage + 1); page += 1) {
+      pages.push(page);
     }
-    if (cp < tp - 2) pages.push('...');
-    pages.push(tp);
+    if (currentPage < totalPages - 2) pages.push('...');
+    pages.push(totalPages);
   }
 
-  let html = '';
-  html += `<button ${cp === 1 ? 'disabled' : ''} onclick="goPage(${cp - 1})">◀ 上一页</button>`;
-
-  for (const p of pages) {
-    if (p === '...') {
-      html += `<span class="ellipsis">...</span>`;
+  let numbers = '';
+  for (const page of pages) {
+    if (page === '...') {
+      numbers += '<span class="page-ellipsis">…</span>';
     } else {
-      html += `<button class="${p === cp ? 'active' : ''}" onclick="goPage(${p})">${p}</button>`;
+      numbers += `<button class="page-btn ${page === currentPage ? 'is-active' : ''}" type="button" data-page="${page}" ${page === currentPage ? 'aria-current="page"' : ''} aria-label="第 ${page} 页">${page}</button>`;
     }
   }
 
-  html += `<button ${cp === tp ? 'disabled' : ''} onclick="goPage(${cp + 1})">下一页 ▶</button>`;
-  html += `<span class="pagination-info">共 ${tp} 页</span>`;
-
-  pag.innerHTML = html;
-}
-
-// ─── Copy ────────────────────────────────────────────────────
-function copySessionId(sessionId, btn) {
-  navigator.clipboard.writeText(sessionId).then(() => {
-    const orig = btn.innerHTML;
-    btn.innerHTML = '✅';
-    btn.classList.add('copied');
-    setTimeout(() => {
-      btn.innerHTML = orig;
-      btn.classList.remove('copied');
-    }, 1500);
-  }).catch(() => {
-    const ta = document.createElement('textarea');
-    ta.value = sessionId;
-    ta.style.position = 'fixed'; ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    const orig = btn.innerHTML;
-    btn.innerHTML = '✅';
-    btn.classList.add('copied');
-    setTimeout(() => {
-      btn.innerHTML = orig;
-      btn.classList.remove('copied');
-    }, 1500);
-  });
-}
-
-// ─── Export ──────────────────────────────────────────────────
-async function exportSession(sessionId, title, timeStr, btn) {
-  const orig = btn.innerHTML;
-  btn.innerHTML = '⏳';
-  btn.disabled = true;
-  try {
-    const res = await fetch(`/api/sessions/${sessionId}/export`);
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-      throw new Error(err.error || 'Export failed');
-    }
-    const data = await res.json();
-    // Build filename: sanitized title + YYYYMMDDHHmmss
-    const now = new Date();
-    const ts = [
-      now.getFullYear(),
-      String(now.getMonth()+1).padStart(2,'0'),
-      String(now.getDate()).padStart(2,'0'),
-      String(now.getHours()).padStart(2,'0'),
-      String(now.getMinutes()).padStart(2,'0'),
-      String(now.getSeconds()).padStart(2,'0'),
-    ].join('');
-    const safeTitle = title.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, '_').substring(0, 80);
-    const filename = `${safeTitle}_${ts}.json`;
-
-    // Trigger download
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    btn.innerHTML = '✅';
-    setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 1500);
-  } catch (e) {
-    btn.innerHTML = '❌';
-    btn.title = e.message;
-    setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 2000);
-  }
+  pagination.innerHTML = `
+    <button class="page-btn" type="button" data-page="${currentPage - 1}" ${currentPage === 1 ? 'disabled' : ''} aria-label="上一页">${icon('arrow-left')}</button>
+    <div class="page-numbers">${numbers}</div>
+    <button class="page-btn" type="button" data-page="${currentPage + 1}" ${currentPage === totalPages ? 'disabled' : ''} aria-label="下一页">${icon('arrow-right')}</button>
+    <span class="pagination-info">第 ${currentPage} 页，共 ${totalPages} 页</span>`;
+  pagination.hidden = false;
 }
 
 // ─── Actions ─────────────────────────────────────────────────
-async function toggleSession(sessionId, index) {
-  const isOpen = state.expandedSessions.has(sessionId);
+const restoreTimers = new WeakMap();
+
+function showButtonFeedback(button, type, label, delay = 1600) {
+  if (!button.dataset.originalHtml) {
+    button.dataset.originalHtml = button.innerHTML;
+    button.dataset.originalTitle = button.title;
+    button.dataset.originalLabel = button.getAttribute('aria-label') || '';
+  }
+
+  clearTimeout(restoreTimers.get(button));
+  button.classList.remove('is-success', 'is-error', 'is-loading');
+  button.removeAttribute('aria-busy');
+  if (type === 'loading') {
+    button.classList.add('is-loading');
+    button.setAttribute('aria-busy', 'true');
+  }
+  if (type === 'success') button.classList.add('is-success');
+  if (type === 'error') button.classList.add('is-error');
+
+  button.innerHTML = type === 'loading'
+    ? '<svg class="mini-spinner" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="30 8"/></svg>'
+    : icon(type === 'success' ? 'check' : 'alert');
+  button.title = label;
+  button.setAttribute('aria-label', label);
+
+  if (type !== 'loading') {
+    const timer = setTimeout(() => {
+      button.innerHTML = button.dataset.originalHtml;
+      button.title = button.dataset.originalTitle;
+      button.setAttribute('aria-label', button.dataset.originalLabel);
+      button.classList.remove('is-success', 'is-error', 'is-loading');
+      button.removeAttribute('aria-busy');
+      delete button.dataset.originalHtml;
+      delete button.dataset.originalTitle;
+      delete button.dataset.originalLabel;
+    }, delay);
+    restoreTimers.set(button, timer);
+  }
+}
+
+async function writeClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch (error) {
+      // Fall through to the selection-based fallback.
+    }
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand('copy');
+  document.body.removeChild(textarea);
+  if (!copied) throw new Error('Clipboard unavailable');
+}
+
+async function copySessionId(index, button) {
+  const session = state.sessions[index];
+  if (!session) return;
+  try {
+    await writeClipboard(session.id);
+    showButtonFeedback(button, 'success', '已复制会话 ID');
+  } catch (error) {
+    showButtonFeedback(button, 'error', '复制失败');
+  }
+}
+
+async function copySessionPath(index, button) {
+  const session = state.sessions[index];
+  const folder = session && (session.directory || session.path);
+  if (!folder) return;
+  try {
+    await writeClipboard(folder);
+    showButtonFeedback(button, 'success', '已复制路径');
+  } catch (error) {
+    showButtonFeedback(button, 'error', '复制失败');
+  }
+}
+
+async function openSessionFolder(index, button) {
+  const session = state.sessions[index];
+  const folder = session && (session.directory || session.path);
+  if (!folder) return;
+
+  button.disabled = true;
+  showButtonFeedback(button, 'loading', '正在打开文件夹');
+
+  try {
+    const response = await fetch('/api/open-folder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: folder }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    showButtonFeedback(button, 'success', '文件夹已打开');
+  } catch (error) {
+    showButtonFeedback(button, 'error', `无法打开文件夹：${error.message}`, 2600);
+    showToast(`无法打开文件夹：${error.message}`, 'error');
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function exportSession(index, button) {
+  const session = state.sessions[index];
+  if (!session) return;
+
+  button.disabled = true;
+  showButtonFeedback(button, 'loading', '正在导出会话');
+
+  try {
+    const response = await fetch(`/api/sessions/${encodeURIComponent(session.id)}/export`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+      throw new Error(error.error || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    const now = new Date();
+    const stamp = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, '0'),
+      String(now.getDate()).padStart(2, '0'),
+      String(now.getHours()).padStart(2, '0'),
+      String(now.getMinutes()).padStart(2, '0'),
+      String(now.getSeconds()).padStart(2, '0'),
+    ].join('');
+    const safeTitle = (session.title || 'session')
+      .replace(/[\\/:*?"<>|]/g, '_')
+      .replace(/\s+/g, '_')
+      .slice(0, 80);
+    const filename = `${safeTitle}_${stamp}.json`;
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+
+    showButtonFeedback(button, 'success', '会话已导出');
+    showToast(`已导出 ${filename}`);
+  } catch (error) {
+    showButtonFeedback(button, 'error', `导出失败：${error.message}`, 2400);
+    showToast(`导出失败：${error.message}`, 'error');
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function loadSessionMessages(index) {
+  const session = state.sessions[index];
+  const container = $(`msgs-${index}`);
+  if (!session || !container) return;
+
+  container.innerHTML = inlineLoadingMarkup();
+
+  try {
+    const data = await api(`/api/sessions/${encodeURIComponent(session.id)}/messages?limit=10`);
+    state.sessionMessages[session.id] = Array.isArray(data.messages) ? data.messages : [];
+    renderMessages(index, state.sessionMessages[session.id]);
+  } catch (error) {
+    container.innerHTML = `<div class="inline-error">
+      ${icon('alert')}
+      <span>无法读取输入</span>
+      <button class="text-button" type="button" data-action="retry-messages" data-index="${index}">重试</button>
+    </div>`;
+  }
+}
+
+async function toggleSession(index) {
+  const session = state.sessions[index];
+  const card = $('sessionList').querySelectorAll('.session')[index];
+  if (!session || !card) return;
+
+  const detail = $(`detail-${index}`);
+  const chevron = card.querySelector('[data-action="toggle"]');
+  const title = session.title || '未命名会话';
+  const isOpen = state.expandedSessions.has(session.id);
 
   if (isOpen) {
-    state.expandedSessions.delete(sessionId);
-    document.getElementById(`card-${index}`).classList.remove('open');
+    state.expandedSessions.delete(session.id);
+    card.classList.remove('is-open');
+    detail.setAttribute('aria-hidden', 'true');
+    detail.inert = true;
+    chevron.setAttribute('aria-expanded', 'false');
+    chevron.setAttribute('aria-label', `展开会话：${title}`);
     return;
   }
 
-  state.expandedSessions.add(sessionId);
-  document.getElementById(`card-${index}`).classList.add('open');
+  if (state.pendingSessions.has(session.id)) return;
 
-  // Load messages if not cached
-  if (!state.sessionMessages[sessionId]) {
-    const msgsDiv = document.getElementById(`msgs-${index}`);
-    try {
-      const data = await api(`/api/sessions/${sessionId}/messages?limit=10`);
-      state.sessionMessages[sessionId] = data.messages;
-      renderMessages(index, data.messages);
-    } catch (e) {
-      msgsDiv.innerHTML = `<div class="error">加载失败: ${escapeHtml(e.message)}</div>`;
-    }
+  state.expandedSessions.add(session.id);
+  chevron.setAttribute('aria-expanded', 'true');
+  chevron.setAttribute('aria-label', `收起会话：${title}`);
+
+  if (state.sessionMessages[session.id]) {
+    renderMessages(index, state.sessionMessages[session.id]);
   } else {
-    renderMessages(index, state.sessionMessages[sessionId]);
+    state.pendingSessions.add(session.id);
+    await loadSessionMessages(index);
+    state.pendingSessions.delete(session.id);
   }
+
+  if (!state.expandedSessions.has(session.id)) return;
+
+  detail.inert = false;
+  detail.setAttribute('aria-hidden', 'false');
+  card.classList.add('is-open');
 }
 
-function renderMessages(index, messages) {
-  const div = document.getElementById(`msgs-${index}`);
-  if (!messages || messages.length === 0) {
-    div.innerHTML = '<div class="no-msgs">该会话暂无用户输入记录</div>';
+function handleListClick(event) {
+  const actionTarget = event.target.closest('[data-action]');
+  if (actionTarget) {
+    const index = Number(actionTarget.dataset.index);
+    const action = actionTarget.dataset.action;
+    if (action === 'toggle') toggleSession(index);
+    if (action === 'copy') copySessionId(index, actionTarget);
+    if (action === 'copy-path') copySessionPath(index, actionTarget);
+    if (action === 'open-folder') openSessionFolder(index, actionTarget);
+    if (action === 'export') exportSession(index, actionTarget);
+    if (action === 'retry-messages') loadSessionMessages(index);
+    if (action === 'clear-search') clearSearch();
     return;
   }
 
-  div.innerHTML = `<ul class="msg-list">${messages.map((m, mi) => `
-    <li class="msg-item">
-      <div class="msg-time">#${messages.length - mi} · ${formatTime(m.time_created)}</div>
-      ${m.agent ? `<div class="msg-agent">🤖 Agent: ${escapeHtml(m.agent)}</div>` : ''}
-      <div>${escapeHtml(m.text || '(空输入)')}</div>
-    </li>
-  `).join('')}</ul>`;
+  const summary = event.target.closest('.session-summary');
+  if (summary) toggleSession(Number(summary.dataset.index));
 }
 
-function goPage(p) {
-  if (p < 1 || p > state.totalPages || p === state.page) return;
-  state.page = p;
+// ─── Navigation and filters ──────────────────────────────────
+function goPage(page) {
+  if (page < 1 || page > state.totalPages || page === state.page) return;
+  state.page = page;
   loadSessions();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
 }
 
 function changePageSize() {
-  state.limit = parseInt(document.getElementById('pageSize').value);
+  state.limit = Number($('pageSize').value) || 20;
   state.page = 1;
   loadSessions();
 }
 
 function changeSort() {
-  state.sort = document.getElementById('sortOrder').value;
+  state.sort = $('sortOrder').value;
   state.page = 1;
   loadSessions();
 }
 
-function onSearch() {
+function updateClearButton() {
+  $('clearSearch').hidden = $('searchInput').value.length === 0;
+}
+
+function onSearchInput() {
+  updateClearButton();
   clearTimeout(state.searchTimer);
   state.searchTimer = setTimeout(() => {
-    state.query = document.getElementById('searchInput').value.trim();
+    state.query = $('searchInput').value.trim();
     state.page = 1;
     loadSessions();
   }, 300);
 }
 
-function refreshSessions() {
-  document.getElementById('searchInput').value = '';
+function clearSearch() {
+  clearTimeout(state.searchTimer);
+  $('searchInput').value = '';
   state.query = '';
-  state.expandedSessions.clear();
-  state.sessionMessages = {};
+  state.page = 1;
+  updateClearButton();
+  loadSessions();
+  $('searchInput').focus();
+}
+
+function refreshSessions() {
   loadSessions();
 }
 
-// ─── Keyboard shortcuts ──────────────────────────────────────
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'ArrowLeft' && !e.target.closest('input,select,textarea')) {
+// ─── Events ──────────────────────────────────────────────────
+$('themeToggle').addEventListener('click', toggleTheme);
+$('searchInput').addEventListener('input', onSearchInput);
+$('clearSearch').addEventListener('click', clearSearch);
+$('sortOrder').addEventListener('change', changeSort);
+$('pageSize').addEventListener('change', changePageSize);
+$('refreshBtn').addEventListener('click', refreshSessions);
+$('retryBtn').addEventListener('click', loadSessions);
+$('sessionList').addEventListener('click', handleListClick);
+
+$('pagination').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-page]');
+  if (!button || button.disabled) return;
+  goPage(Number(button.dataset.page));
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (event.target.closest('input, select, textarea, [contenteditable="true"]')) return;
+
+  if (event.key === 'ArrowLeft') {
+    event.preventDefault();
     goPage(state.page - 1);
-  } else if (e.key === 'ArrowRight' && !e.target.closest('input,select,textarea')) {
+  } else if (event.key === 'ArrowRight') {
+    event.preventDefault();
     goPage(state.page + 1);
+  } else if (event.key === 'Escape' && state.query) {
+    event.preventDefault();
+    clearSearch();
   }
 });
 
 // ─── Init ────────────────────────────────────────────────────
+syncThemeControl();
+updateClearButton();
 loadSessions();
 </script>
+
 </body>
 </html>
