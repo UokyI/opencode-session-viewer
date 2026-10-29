@@ -8,10 +8,16 @@ import json
 import os
 import sys
 import shutil
+import shlex
+import socket
 import subprocess
 import threading
+import time
+import atexit
+import urllib.error
+import urllib.request
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, urlencode, quote
 
 # ─── Configuration ───────────────────────────────────────────
 DB_PATH = os.environ.get(
@@ -53,6 +59,174 @@ def open_directory(path):
         subprocess.Popen(["open", path])
     else:
         subprocess.Popen(["xdg-open", path])
+
+
+# ─── opencode server bridge (used for forking) ───────────────
+_server_lock = threading.RLock()
+_server_process = None
+_server_port = None
+_local_opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+def _find_opencode():
+    """Locate the opencode executable, preferring a real binary over wrappers."""
+    if os.name != "nt":
+        return shutil.which("opencode")
+
+    exe = shutil.which("opencode.exe")
+    if exe:
+        return exe
+
+    wrapper = shutil.which("opencode")
+    if not wrapper:
+        return None
+
+    # npm installs a .cmd/.ps1 wrapper; run the binary it points to directly.
+    candidate = os.path.join(
+        os.path.dirname(wrapper), "node_modules", "opencode-ai", "bin", "opencode.exe"
+    )
+    return candidate if os.path.isfile(candidate) else wrapper
+
+
+def _free_local_port():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
+def _stop_opencode_server():
+    global _server_process, _server_port
+    with _server_lock:
+        process = _server_process
+        _server_process = None
+        _server_port = None
+
+    if not process or process.poll() is not None:
+        return
+
+    if os.name == "nt":
+        try:
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                capture_output=True, timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+            return
+        except Exception:
+            pass
+
+    try:
+        process.terminate()
+        process.wait(timeout=5)
+    except Exception:
+        try:
+            process.kill()
+        except Exception:
+            pass
+
+
+atexit.register(_stop_opencode_server)
+
+
+def _start_opencode_server():
+    command = _find_opencode()
+    if not command:
+        raise RuntimeError("未找到 opencode 命令，请确认已安装并在 PATH 中")
+
+    port = _free_local_port()
+    env = os.environ.copy()
+    env["OPENCODE_DB"] = os.path.abspath(DB_PATH)
+    env.pop("OPENCODE_SERVER_PASSWORD", None)
+    env.pop("OPENCODE_SERVER_USERNAME", None)
+
+    kwargs = {}
+    if os.name == "nt":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+    process = subprocess.Popen(
+        [command, "serve", "--port", str(port), "--hostname", "127.0.0.1"],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        env=env,
+        **kwargs,
+    )
+
+    ready_url = f"http://127.0.0.1:{port}/doc"
+    deadline = time.time() + 30
+    while time.time() < deadline:
+        if process.poll() is not None:
+            raise RuntimeError("opencode 服务启动失败")
+        try:
+            with _local_opener.open(ready_url, timeout=1) as response:
+                if response.status == 200:
+                    return process, port
+        except Exception:
+            pass
+        time.sleep(0.2)
+
+    try:
+        process.terminate()
+    except Exception:
+        pass
+    raise RuntimeError("opencode 服务启动超时")
+
+
+def _get_opencode_server():
+    global _server_process, _server_port
+    with _server_lock:
+        if _server_process and _server_process.poll() is None and _server_port:
+            return _server_process, _server_port
+        try:
+            _stop_opencode_server()
+        except Exception:
+            pass
+        process, port = _start_opencode_server()
+        _server_process = process
+        _server_port = port
+        return process, port
+
+
+def _launch_terminal(command, session_id, directory, env):
+    """Open a terminal window running `opencode --session <id>`."""
+    args = [command, "--session", session_id]
+
+    if os.name == "nt":
+        subprocess.Popen(
+            args,
+            cwd=directory,
+            env=env,
+            creationflags=subprocess.CREATE_NEW_CONSOLE,
+        )
+        return
+
+    if sys.platform == "darwin":
+        quoted_dir = shlex.quote(directory or os.getcwd())
+        quoted_cmd = shlex.quote(command)
+        quoted_session = shlex.quote(session_id)
+        script = (
+            'tell application "Terminal" to do script '
+            f'"cd {quoted_dir} && {quoted_cmd} --session {quoted_session}"'
+        )
+        subprocess.Popen(["osascript", "-e", script], env=env)
+        return
+
+    terminals = [
+        ("x-terminal-emulator", ["-e"]),
+        ("gnome-terminal", ["--"]),
+        ("konsole", ["-e"]),
+        ("xfce4-terminal", ["-e"]),
+        ("xterm", ["-e"]),
+    ]
+    for name, prefix in terminals:
+        terminal = shutil.which(name)
+        if not terminal:
+            continue
+        subprocess.Popen([terminal, *prefix, *args], cwd=directory, env=env)
+        return
+
+    raise RuntimeError("未找到可用的终端程序")
+
 
 # ─── API Handlers ─────────────────────────────────────────────
 def api_sessions(params):
@@ -231,12 +405,47 @@ class RequestHandler(BaseHTTPRequestHandler):
         body = content.encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "no-store, must-revalidate")
         self.send_header("Content-Length", len(body))
         self.end_headers()
         self.wfile.write(body)
 
     def _send_error(self, status, message):
         self._send_json({"error": message}, status)
+
+    def _is_local_request(self):
+        if self.client_address[0] not in ("127.0.0.1", "::1", "::ffff:127.0.0.1"):
+            return False
+
+        origin = self.headers.get("Origin")
+        if origin:
+            origin_host = urlparse(origin).netloc
+            request_host = self.headers.get("Host", "")
+            if origin_host != request_host:
+                return False
+        return True
+
+    def _read_json_body(self, max_bytes=4096):
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+        except ValueError:
+            self._send_error(400, "Invalid request body")
+            return None
+
+        if length <= 0 or length > max_bytes:
+            self._send_error(400, "Invalid request body")
+            return None
+
+        try:
+            payload = json.loads(self.rfile.read(length).decode("utf-8"))
+        except (ValueError, json.JSONDecodeError) as e:
+            self._send_error(400, f"Invalid request: {e}")
+            return None
+
+        if not isinstance(payload, dict):
+            self._send_error(400, "Invalid request body")
+            return None
+        return payload
 
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -279,29 +488,38 @@ class RequestHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
 
-        if path != "/api/open-folder":
+        is_fork = path.startswith("/api/sessions/") and path.endswith("/fork")
+        is_open = path.startswith("/api/sessions/") and path.endswith("/open")
+        if path != "/api/open-folder" and not is_fork and not is_open:
             self._send_error(404, "Not Found")
             return
 
-        if self.client_address[0] not in ("127.0.0.1", "::1", "::ffff:127.0.0.1"):
-            self._send_error(403, "Folder opening is available locally only")
+        if not self._is_local_request():
+            self._send_error(403, "此操作仅限本机访问")
             return
 
-        origin = self.headers.get("Origin")
-        if origin:
-            origin_host = urlparse(origin).netloc
-            request_host = self.headers.get("Host", "")
-            if origin_host != request_host:
-                self._send_error(403, "Cross-origin request rejected")
+        if is_fork or is_open:
+            parts = path.strip("/").split("/")
+            if len(parts) != 4 or not parts[2]:
+                self._send_error(404, "Not Found")
                 return
+            payload = self._read_json_body()
+            if payload is None:
+                return
+            try:
+                if is_fork:
+                    api_fork_session(self, parts[2], payload)
+                else:
+                    api_open_session(self, parts[2])
+            except Exception as e:
+                self._send_error(500, str(e))
+            return
+
+        payload = self._read_json_body()
+        if payload is None:
+            return
 
         try:
-            length = int(self.headers.get("Content-Length", 0))
-            if length <= 0 or length > 4096:
-                self._send_error(400, "Invalid request body")
-                return
-
-            payload = json.loads(self.rfile.read(length).decode("utf-8"))
             folder = payload.get("path")
             if not isinstance(folder, str) or not folder.strip():
                 self._send_error(400, "Missing folder path")
@@ -316,8 +534,6 @@ class RequestHandler(BaseHTTPRequestHandler):
 
             open_directory(folder)
             self._send_json({"ok": True, "path": folder})
-        except (ValueError, json.JSONDecodeError) as e:
-            self._send_error(400, f"Invalid request: {e}")
         except Exception as e:
             self._send_error(500, str(e))
 
@@ -327,6 +543,19 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
+
+
+class ViewerHTTPServer(ThreadingHTTPServer):
+    """HTTP server that refuses to share its port with another instance."""
+
+    allow_reuse_address = os.name != "nt"
+
+    def server_bind(self):
+        if os.name == "nt":
+            # Without this, Windows lets a second process bind the same port,
+            # so stale instances keep answering requests on the old code.
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
 
 
 def api_export_session(handler, session_id):
@@ -364,6 +593,143 @@ def api_export_session(handler, session_id):
         handler._send_error(500, f"Invalid JSON from opencode: {e}")
     except Exception as e:
         handler._send_error(500, str(e))
+
+
+def _opencode_error_detail(error):
+    detail = error.read().decode("utf-8", errors="replace").strip()
+    try:
+        parsed = json.loads(detail)
+        if isinstance(parsed, dict):
+            message = parsed.get("message") or parsed.get("error")
+            if message is not None:
+                detail = message if isinstance(message, str) else json.dumps(
+                    message, ensure_ascii=False
+                )
+    except Exception:
+        pass
+    return detail[:400]
+
+
+def _fetch_message_ids(port, session_id, directory):
+    """Return every message ID of a session in chronological order."""
+    url = f"http://127.0.0.1:{port}/session/{quote(session_id, safe='')}/message"
+    if directory:
+        url += f"?{urlencode({'directory': directory})}"
+
+    request = urllib.request.Request(url, method="GET")
+    with _local_opener.open(request, timeout=60) as response:
+        data = json.loads(response.read().decode("utf-8"))
+
+    message_ids = []
+    for item in data if isinstance(data, list) else []:
+        if not isinstance(item, dict):
+            continue
+        message_id = (item.get("info") or {}).get("id")
+        if isinstance(message_id, str):
+            message_ids.append(message_id)
+    return message_ids
+
+
+def api_fork_session(handler, session_id, payload):
+    """POST /api/sessions/{id}/fork — fork a session up to a user message (inclusive)."""
+    message_id = payload.get("messageID")
+    if not isinstance(message_id, str) or not message_id.startswith("msg"):
+        handler._send_error(400, "缺少有效的 messageID")
+        return
+
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT directory FROM session WHERE id = ?", (session_id,)
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        handler._send_error(404, "会话不存在")
+        return
+
+    directory = row["directory"]
+
+    try:
+        _process, port = _get_opencode_server()
+    except Exception as e:
+        handler._send_error(500, f"无法启动 opencode 服务：{e}")
+        return
+
+    try:
+        message_ids = _fetch_message_ids(port, session_id, directory)
+    except urllib.error.HTTPError as e:
+        handler._send_error(500, f"无法读取会话消息：{_opencode_error_detail(e)}")
+        return
+    except Exception as e:
+        handler._send_error(500, f"无法读取会话消息：{e}")
+        return
+
+    try:
+        index = message_ids.index(message_id)
+    except ValueError:
+        handler._send_error(400, "未找到该输入对应的消息，无法创建分支")
+        return
+
+    # opencode forks *before* the given message, so use the next message ID to
+    # include the selected input. With no next message, fork the whole session.
+    fork_payload = {}
+    if index + 1 < len(message_ids):
+        fork_payload["messageID"] = message_ids[index + 1]
+
+    query = urlencode({"directory": directory}) if directory else ""
+    url = f"http://127.0.0.1:{port}/session/{quote(session_id, safe='')}/fork"
+    if query:
+        url += f"?{query}"
+
+    body = json.dumps(fork_payload).encode("utf-8")
+    request = urllib.request.Request(
+        url, data=body, method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+
+    try:
+        with _local_opener.open(request, timeout=120) as response:
+            data = json.loads(response.read().decode("utf-8"))
+        handler._send_json({"session": data})
+    except urllib.error.HTTPError as e:
+        handler._send_error(e.code, f"创建分支失败：{_opencode_error_detail(e)}")
+    except Exception as e:
+        handler._send_error(500, f"创建分支失败：{e}")
+
+
+def api_open_session(handler, session_id):
+    """POST /api/sessions/{id}/open — open this session in an opencode window."""
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT directory FROM session WHERE id = ?", (session_id,)
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        handler._send_error(404, "会话不存在")
+        return
+
+    directory = row["directory"]
+    if not directory or not os.path.isdir(directory):
+        directory = None
+
+    command = _find_opencode()
+    if not command:
+        handler._send_error(500, "未找到 opencode 命令，请确认已安装并在 PATH 中")
+        return
+
+    env = os.environ.copy()
+    env["OPENCODE_DB"] = os.path.abspath(DB_PATH)
+
+    try:
+        _launch_terminal(command, session_id, directory, env)
+        handler._send_json({"ok": True})
+    except Exception as e:
+        handler._send_error(500, f"无法打开 opencode：{e}")
 
 
 def api_session_messages_by_id(session_id, params):
@@ -461,7 +827,13 @@ def main():
     if not os.environ.get("OPENCODE_NO_BROWSER"):
         threading.Thread(target=_open_browser, args=(url,), daemon=True).start()
 
-    server = ThreadingHTTPServer(("0.0.0.0", PORT), RequestHandler)
+    try:
+        server = ViewerHTTPServer(("0.0.0.0", PORT), RequestHandler)
+    except OSError as e:
+        print(f"\n  Cannot listen on port {PORT}: {e}")
+        print("  Another viewer may already be running. Close it or use --port.\n")
+        sys.exit(1)
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:
