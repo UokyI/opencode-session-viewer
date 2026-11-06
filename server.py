@@ -108,18 +108,24 @@ def save_settings(settings):
         json.dump(settings, handle, ensure_ascii=False, indent=2)
 
 
+def _custom_db_label(index):
+    return f"拟{index + 1}"
+
+
 def get_databases():
     settings = load_settings()
     databases = [{
         "id": "default",
-        "label": "默认数据库",
+        "label": "默认",
         "path": DB_PATH,
         "enabled": settings["default_enabled"],
         "builtin": True,
         "exists": os.path.isfile(DB_PATH),
+        "index": 0,
     }]
 
     seen = {os.path.normcase(os.path.abspath(DB_PATH))}
+    custom_index = 0
     for item in settings["custom"]:
         key = os.path.normcase(os.path.abspath(item["path"]))
         if key in seen:
@@ -127,12 +133,14 @@ def get_databases():
         seen.add(key)
         databases.append({
             "id": item["id"],
-            "label": "自定义数据库",
+            "label": _custom_db_label(custom_index),
             "path": item["path"],
             "enabled": item["enabled"],
             "builtin": False,
             "exists": os.path.isfile(item["path"]),
+            "index": custom_index + 1,
         })
+        custom_index += 1
 
     return databases
 
@@ -424,7 +432,7 @@ def _flag(params, name):
     return params.get(name, ["0"])[0].lower() in ("1", "true", "on", "yes")
 
 
-def _session_dict(row, database):
+def _session_dict(row, database, db_total):
     return {
         "id": row["id"],
         "title": row["title"],
@@ -449,6 +457,8 @@ def _session_dict(row, database):
         "user_message_count": row["user_message_count"],
         "db": database["id"],
         "db_label": database["label"],
+        "db_index": database.get("index", 0),
+        "db_total": db_total,
     }
 
 
@@ -507,7 +517,13 @@ def api_sessions(params):
     where_clause = f"WHERE {' AND '.join(clauses)}" if clauses else ""
 
     sessions = []
-    for database in get_enabled_databases():
+    all_databases = get_databases()
+    db_total = len(all_databases)
+    databases = [
+        database for database in all_databases
+        if database["enabled"] and database["exists"]
+    ]
+    for database in databases:
         try:
             conn = get_db(database["path"])
         except sqlite3.Error:
@@ -528,7 +544,7 @@ def api_sessions(params):
 
         for row in rows:
             try:
-                sessions.append(_session_dict(row, database))
+                sessions.append(_session_dict(row, database, db_total))
             except (KeyError, TypeError, ValueError):
                 continue
 
@@ -554,6 +570,7 @@ def api_sessions(params):
         "page": page,
         "limit": limit,
         "total_pages": max(1, (total + limit - 1) // limit),
+        "database_count": len(databases),
     }
 
 def api_session_messages(params):
