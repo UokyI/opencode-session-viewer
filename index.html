@@ -352,7 +352,9 @@
     color: var(--ink);
   }
 
-  .theme-toggle {
+  .theme-toggle,
+  .download-db,
+  .settings-button {
     border-color: var(--glass-border);
     border-radius: var(--radius-lg);
     background: linear-gradient(165deg, var(--glass-top), var(--glass-bottom));
@@ -361,7 +363,9 @@
     backdrop-filter: blur(12px);
   }
 
-  .theme-toggle:hover { background: var(--surface-strong); }
+  .theme-toggle:hover,
+  .download-db:hover,
+  .settings-button:hover { background: var(--surface-strong); }
 
   .icon-sun,
   [data-theme="dark"] .icon-moon { display: none; }
@@ -513,6 +517,72 @@
   }
 
   .refresh-button:disabled { cursor: wait; opacity: 0.65; }
+
+  .toggle-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 12px;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .toggle-control .switch {
+    position: relative;
+    display: inline-flex;
+    width: 34px;
+    height: 20px;
+    flex: none;
+  }
+
+  .switch input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .switch-track {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--pill);
+    background: var(--surface-soft);
+    box-shadow: 0 1px 0 var(--sheen) inset;
+    transition: background-color 0.18s ease, border-color 0.18s ease;
+  }
+
+  .switch-track::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--faint);
+    transition: transform 0.18s ease, background-color 0.18s ease;
+  }
+
+  .switch input:checked + .switch-track {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--line-strong));
+    background: var(--accent-wash);
+  }
+
+  .switch input:checked + .switch-track::after {
+    transform: translateX(14px);
+    background: var(--accent);
+  }
+
+  .switch input:focus-visible + .switch-track {
+    box-shadow: 0 0 0 3px var(--accent-wash);
+  }
 
   .refresh-button.is-loading .icon { animation: spin 0.8s linear infinite; }
 
@@ -1178,6 +1248,453 @@
     color: var(--danger);
   }
 
+  /* ── Conversation modal ───────────────────────────────────── */
+  body.has-modal { overflow: hidden; }
+
+  .conversation-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .conversation-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(7, 19, 30, 0.5);
+    -webkit-backdrop-filter: blur(5px);
+    backdrop-filter: blur(5px);
+  }
+
+  [data-theme="light"] .conversation-backdrop {
+    background: rgba(24, 62, 96, 0.32);
+  }
+
+  .conversation-dialog {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: min(980px, 100%);
+    max-height: min(86vh, 920px);
+    overflow: hidden;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-xl);
+    background: linear-gradient(155deg, var(--glass-top), var(--glass-bottom));
+    box-shadow: var(--glass-shadow), 0 1px 0 var(--sheen) inset;
+    -webkit-backdrop-filter: var(--blur);
+    backdrop-filter: var(--blur);
+  }
+
+  .conversation-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .conversation-heading { min-width: 0; }
+
+  .conversation-title {
+    margin: 0;
+    color: var(--ink);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .conversation-meta {
+    margin: 4px 0 0;
+    color: var(--faint);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .conversation-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 4px 20px 22px;
+    overscroll-behavior: contain;
+  }
+
+  .conversation-body .loading-state { min-height: 240px; }
+
+  .conv-message {
+    padding: 16px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .conv-message:last-child { border-bottom: 0; }
+
+  .conv-message-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .conv-role {
+    flex: none;
+    padding: 2px 9px;
+    border-radius: var(--pill);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+
+  .conv-user .conv-role {
+    background: var(--accent-wash);
+    color: var(--accent);
+  }
+
+  .conv-assistant .conv-role {
+    background: color-mix(in srgb, var(--positive) 14%, transparent);
+    color: var(--positive);
+  }
+
+  .conv-time {
+    color: var(--faint);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .conv-meta {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: 10.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .conv-parts {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .conv-text {
+    color: var(--ink-soft);
+    font-size: 13px;
+    line-height: 1.72;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .conv-user .conv-text { color: var(--ink); }
+
+  .conv-part {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface-soft);
+  }
+
+  .conv-part > summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    list-style: none;
+    color: var(--muted);
+    font-size: 11.5px;
+    user-select: none;
+  }
+
+  .conv-part > summary::-webkit-details-marker { display: none; }
+
+  .conv-part > summary .icon { width: 13px; height: 13px; flex: none; }
+
+  .conv-part[open] > summary { border-bottom: 1px solid var(--line); }
+
+  .conv-tool-name {
+    color: var(--ink-soft);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+  }
+
+  .conv-tool-summary {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--faint);
+    font-size: 10.5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .conv-status {
+    margin-left: auto;
+    padding: 1px 8px;
+    border-radius: var(--pill);
+    font-size: 10px;
+  }
+
+  .conv-status-completed {
+    background: color-mix(in srgb, var(--positive) 12%, transparent);
+    color: var(--positive);
+  }
+
+  .conv-status-error {
+    background: var(--danger-wash);
+    color: var(--danger);
+  }
+
+  .conv-status-running,
+  .conv-status-pending {
+    background: var(--accent-wash);
+    color: var(--accent);
+  }
+
+  .conv-tool-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 12px 12px;
+  }
+
+  .conv-field-label {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--faint);
+    font-size: 10px;
+  }
+
+  .conv-pre {
+    max-height: 340px;
+    margin: 0;
+    padding: 10px 12px;
+    overflow: auto;
+    border-radius: var(--radius);
+    background: var(--bg-deep);
+    color: var(--ink-soft);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .conv-file,
+  .conv-patch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    color: var(--muted);
+    font-size: 11.5px;
+  }
+
+  .conv-file .icon,
+  .conv-patch .icon { width: 13px; height: 13px; flex: none; }
+
+  .conv-patch code {
+    margin-left: 6px;
+    color: var(--ink-soft);
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+
+  .conv-error {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 9px 12px;
+    border-radius: var(--radius);
+    background: var(--danger-wash);
+    color: var(--danger);
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  .conv-error .icon { width: 14px; height: 14px; flex: none; margin-top: 1px; }
+
+  .detail-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 10px;
+  }
+
+  .detail-full-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 11px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--pill);
+    background: var(--surface-soft);
+    color: var(--muted);
+    font: inherit;
+    font-size: 11.5px;
+    transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+  }
+
+  .detail-full-button .icon { width: 13px; height: 13px; }
+
+  .detail-full-button:hover {
+    border-color: color-mix(in srgb, var(--accent) 30%, var(--line-strong));
+    background: var(--accent-wash);
+    color: var(--accent);
+  }
+
+  /* ── Settings dialog ──────────────────────────────────────── */
+  .settings-dialog {
+    width: min(720px, 100%);
+    max-height: min(84vh, 820px);
+  }
+
+  .settings-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px 20px 22px;
+  }
+
+  .settings-master {
+    justify-content: space-between;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .db-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .db-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface-soft);
+  }
+
+  .db-item.is-missing {
+    border-color: color-mix(in srgb, var(--danger) 30%, var(--line));
+  }
+
+  .db-main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .db-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .db-label {
+    color: var(--ink-soft);
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+
+  .db-badge {
+    padding: 1px 6px;
+    border-radius: var(--pill);
+    background: var(--accent-wash);
+    color: var(--accent);
+    font-size: 9.5px;
+  }
+
+  .db-badge.is-missing {
+    background: var(--danger-wash);
+    color: var(--danger);
+  }
+
+  .mini-button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  .db-path {
+    overflow: hidden;
+    color: var(--faint);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .db-item.is-missing .db-path { color: var(--danger); }
+
+  .db-actions {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .db-add {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .db-add input {
+    flex: 1;
+    height: 36px;
+    min-width: 0;
+    padding: 0 12px;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    background: var(--surface-soft);
+    color: var(--ink);
+    font-size: 12.5px;
+    outline: none;
+    transition: border-color 0.16s ease, box-shadow 0.16s ease;
+  }
+
+  .db-add input:focus {
+    border-color: color-mix(in srgb, var(--accent) 62%, transparent);
+    box-shadow: 0 0 0 3px var(--accent-wash);
+  }
+
+  .settings-hint {
+    min-height: 16px;
+    margin: 0;
+    color: var(--muted);
+    font-size: 11.5px;
+    line-height: 1.5;
+  }
+
+  .settings-hint.is-error { color: var(--danger); }
+
+  @media (max-width: 620px) {
+    .conversation-modal { padding: 0; }
+    .conversation-dialog {
+      width: 100%;
+      max-height: 100vh;
+      height: 100vh;
+      border: 0;
+      border-radius: 0;
+    }
+    .conversation-head { padding: 16px 16px 12px; }
+    .conversation-body { padding: 2px 16px 20px; }
+    .conv-meta { display: none; }
+  }
+
   /* ── Motion ───────────────────────────────────────────────── */
   @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -1240,6 +1757,7 @@
     .controls {
       width: 100%;
       margin-left: 0;
+      flex-wrap: wrap;
     }
 
     .refresh-button { margin-left: auto; }
@@ -1338,12 +1856,17 @@
   @media (max-width: 430px) {
     .controls {
       display: grid;
-      grid-template-columns: 1fr 1fr auto;
+      grid-template-columns: 1fr 1fr;
       gap: 8px;
     }
 
+    .toggle-control,
     .select-control { justify-content: space-between; }
-    .refresh-button { margin-left: 0; }
+    .refresh-button {
+      grid-column: 1 / -1;
+      justify-self: end;
+      margin-left: 0;
+    }
 
     .header-tail { gap: 10px; }
     .header-stats { gap: 8px; }
@@ -1381,6 +1904,8 @@
   <symbol id="icon-check" viewBox="0 0 16 16"><path d="m3 8.5 3 3 7-7"/></symbol>
   <symbol id="icon-arrow-left" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></symbol>
   <symbol id="icon-arrow-right" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></symbol>
+  <symbol id="icon-settings" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.4"/><path d="M8 1.6v2M8 12.4v2M1.6 8h2M12.4 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M12.5 3.5l-1.4 1.4M4.9 11.1l-1.4 1.4"/></symbol>
+  <symbol id="icon-database" viewBox="0 0 16 16"><ellipse cx="8" cy="3.6" rx="4.5" ry="1.8"/><path d="M3.5 3.6v8.8c0 1 2 1.8 4.5 1.8s4.5-.8 4.5-1.8V3.6"/><path d="M3.5 8c0 1 2 1.8 4.5 1.8s4.5-.8 4.5-1.8"/></symbol>
 </svg>
 
 <header class="site-header">
@@ -1393,6 +1918,12 @@
     </a>
     <div class="header-tail">
       <p class="header-stats" id="headerStats"><span>正在读取会话</span></p>
+      <button class="icon-button settings-button" type="button" id="settingsBtn" title="数据库设置" aria-label="数据库设置">
+        <svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg>
+      </button>
+      <button class="icon-button download-db" type="button" id="downloadDb" title="下载默认数据库文件" aria-label="下载默认数据库文件">
+        <svg class="icon" aria-hidden="true"><use href="#icon-download"></use></svg>
+      </button>
       <button class="icon-button theme-toggle" type="button" id="themeToggle" title="切换主题" aria-label="切换主题">
         <svg class="icon icon-moon" aria-hidden="true"><use href="#icon-moon"></use></svg>
         <svg class="icon icon-sun" aria-hidden="true"><use href="#icon-sun"></use></svg>
@@ -1414,6 +1945,20 @@
       </button>
     </div>
     <div class="controls">
+      <label class="toggle-control" for="searchContent">
+        <span>搜索内容</span>
+        <span class="switch">
+          <input type="checkbox" id="searchContent">
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="toggle-control" for="showChildren">
+        <span>显示子会话</span>
+        <span class="switch">
+          <input type="checkbox" id="showChildren">
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+      </label>
       <label class="select-control" for="sortOrder">
         <span>排序</span>
         <span class="select-shell">
@@ -1468,6 +2013,53 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
+<div class="conversation-modal" id="conversationModal" hidden>
+  <div class="conversation-backdrop" data-action="close-conversation"></div>
+  <div class="conversation-dialog" role="dialog" aria-modal="true" aria-labelledby="conversationTitle">
+    <header class="conversation-head">
+      <div class="conversation-heading">
+        <h2 class="conversation-title" id="conversationTitle">完整对话</h2>
+        <p class="conversation-meta" id="conversationMeta"></p>
+      </div>
+      <button class="icon-button" type="button" id="conversationClose" title="关闭完整对话" aria-label="关闭完整对话">
+        <svg class="icon" aria-hidden="true"><use href="#icon-x"></use></svg>
+      </button>
+    </header>
+    <div class="conversation-body" id="conversationBody"></div>
+  </div>
+</div>
+
+<div class="conversation-modal" id="settingsModal" hidden>
+  <div class="conversation-backdrop" data-action="close-settings"></div>
+  <div class="conversation-dialog settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <header class="conversation-head">
+      <div class="conversation-heading">
+        <h2 class="conversation-title" id="settingsTitle">数据库设置</h2>
+        <p class="conversation-meta" id="settingsMeta">选择要读取的数据库</p>
+      </div>
+      <button class="icon-button" type="button" id="settingsClose" title="关闭设置" aria-label="关闭设置">
+        <svg class="icon" aria-hidden="true"><use href="#icon-x"></use></svg>
+      </button>
+    </header>
+    <div class="conversation-body settings-body">
+      <label class="toggle-control settings-master" for="settingsAll">
+        <span>全部启用</span>
+        <span class="switch">
+          <input type="checkbox" id="settingsAll">
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <ul class="db-list" id="dbList"></ul>
+      <div class="db-add">
+        <label class="visually-hidden" for="newDbPath">数据库路径</label>
+        <input type="text" id="newDbPath" placeholder="输入 .db 文件路径，例如 D:\path\to\opencode.db" autocomplete="off" spellcheck="false">
+        <button class="text-button" type="button" id="addDbBtn">添加</button>
+      </div>
+      <p class="settings-hint" id="settingsHint"></p>
+    </div>
+  </div>
+</div>
+
 <script>
 const $ = (id) => document.getElementById(id);
 
@@ -1513,6 +2105,8 @@ const state = {
   limit: 20,
   sort: 'desc',
   query: '',
+  searchContent: false,
+  showChildren: false,
   total: 0,
   totalPages: 0,
   sessions: [],
@@ -1523,6 +2117,15 @@ const state = {
 };
 
 let loadSequence = 0;
+let settingsDatabases = [];
+
+function sessionKey(session) {
+  return `${session.db || 'default'}:${session.id}`;
+}
+
+function sessionDbId(session) {
+  return session.db || 'default';
+}
 
 // ─── API ─────────────────────────────────────────────────────
 async function api(path) {
@@ -1587,7 +2190,9 @@ async function loadSessions() {
 
   try {
     const query = state.query ? `&q=${encodeURIComponent(state.query)}` : '';
-    const data = await api(`/api/sessions?page=${state.page}&limit=${state.limit}&sort=${state.sort}${query}`);
+    const content = state.searchContent ? '&content=1' : '';
+    const children = state.showChildren ? '&children=1' : '';
+    const data = await api(`/api/sessions?page=${state.page}&limit=${state.limit}&sort=${state.sort}${query}${content}${children}`);
     if (sequence !== loadSequence) return;
 
     state.sessions = Array.isArray(data.sessions) ? data.sessions : [];
@@ -1699,7 +2304,7 @@ function renderSessions() {
     const directory = session.directory || session.path || '';
     const agent = session.agent || '';
     const model = modelNameFor(session);
-    const isOpen = state.expandedSessions.has(session.id);
+    const isOpen = state.expandedSessions.has(sessionKey(session));
 
     const inputTokens = Number(session.tokens_input) || 0;
     const outputTokens = Number(session.tokens_output) || 0;
@@ -1733,6 +2338,9 @@ function renderSessions() {
       meta.push(`<span class="meta-item meta-model" title="模型"><span class="meta-key">模型</span>${escapeHtml(model)}</span>`);
     }
     meta.push(`<span class="meta-item">${icon('chat')}<span>${inputs} 次输入</span></span>`);
+    if (session.db && session.db !== 'default') {
+      meta.push(`<span class="meta-item meta-db" title="${escapeHtml(session.db_label || '自定义数据库')}">${icon('database')}<span>${escapeHtml(session.db_label || '自定义库')}</span></span>`);
+    }
     if (session.time_updated && updated.full !== created.full) {
       meta.push(`<span class="meta-item">更新 ${updated.full}</span>`);
     }
@@ -1789,8 +2397,15 @@ function renderSessions() {
               <span>用户输入</span>
               <span class="detail-count">最近 ${Math.min(10, inputs)} 条</span>
             </div>
-            <div class="detail-main" id="msgs-${index}">
-              ${isOpen ? inlineLoadingMarkup() : ''}
+            <div class="detail-main">
+              <div class="detail-toolbar">
+                <button class="detail-full-button" type="button" data-action="show-conversation" data-index="${index}" title="查看完整对话交互记录">
+                  ${icon('chat')}<span>完整对话</span>
+                </button>
+              </div>
+              <div id="msgs-${index}">
+                ${isOpen ? inlineLoadingMarkup() : ''}
+              </div>
             </div>
           </div>
         </div>
@@ -1819,6 +2434,360 @@ function renderMessages(index, messages) {
       <p class="message-text">${escapeHtml(message.text || '(空输入)')}</p>
     </div>`;
   }).join('');
+}
+
+// ─── Conversation modal ──────────────────────────────────────
+let conversationSessionId = null;
+let conversationDbId = null;
+let conversationTrigger = null;
+let conversationRenderToken = 0;
+
+function conversationStatusLabel(status) {
+  return ({
+    completed: '完成',
+    error: '失败',
+    running: '运行中',
+    pending: '等待',
+  })[status] || status || '未知';
+}
+
+function conversationPartMarkup(part) {
+  if (!part) return '';
+
+  if (part.type === 'text') {
+    if (!part.text) return '';
+    return `<div class="conv-text">${escapeHtml(part.text)}</div>`;
+  }
+
+  if (part.type === 'reasoning') {
+    if (!part.text) return '';
+    return `<details class="conv-part conv-reasoning">
+      <summary>${icon('chat')}<span>思考过程</span></summary>
+      <pre class="conv-pre">${escapeHtml(part.text)}</pre>
+    </details>`;
+  }
+
+  if (part.type === 'tool') {
+    const status = part.status || 'unknown';
+    const statusClass = ['completed', 'error', 'running', 'pending'].includes(status) ? status : 'unknown';
+    const title = part.title
+      ? `<span class="conv-tool-summary">${escapeHtml(part.title)}</span>`
+      : '';
+    return `<details class="conv-part conv-tool">
+      <summary>
+        ${icon('terminal')}
+        <span class="conv-tool-name">${escapeHtml(part.tool || '工具')}</span>
+        ${title}
+        <span class="conv-status conv-status-${statusClass}">${escapeHtml(conversationStatusLabel(status))}</span>
+      </summary>
+      <div class="conv-tool-body">
+        ${part.input ? `<div class="conv-field"><span class="conv-field-label">输入</span><pre class="conv-pre">${escapeHtml(part.input)}</pre></div>` : ''}
+        ${part.output ? `<div class="conv-field"><span class="conv-field-label">输出</span><pre class="conv-pre">${escapeHtml(part.output)}</pre></div>` : ''}
+      </div>
+    </details>`;
+  }
+
+  if (part.type === 'file') {
+    return `<div class="conv-part conv-file">${icon('folder')}<span>${escapeHtml(part.filename || '文件')}</span></div>`;
+  }
+
+  if (part.type === 'patch') {
+    const files = (part.files || []).map((file) => `<code>${escapeHtml(file)}</code>`).join('');
+    return `<div class="conv-part conv-patch">${icon('download')}<span>改动${files}</span></div>`;
+  }
+
+  return '';
+}
+
+function conversationMessageMarkup(message) {
+  const time = timeParts(message.time_created);
+  const isUser = message.role === 'user';
+  const meta = [];
+  if (message.agent) meta.push(escapeHtml(message.agent));
+  if (message.model) meta.push(escapeHtml(message.model));
+  const cost = formatCost(message.cost);
+  if (cost) meta.push(escapeHtml(cost));
+
+  const parts = (message.parts || []).map(conversationPartMarkup).join('');
+  const errorHtml = message.error
+    ? `<div class="conv-error">${icon('alert')}<span>${escapeHtml(message.error)}</span></div>`
+    : '';
+
+  return `<article class="conv-message ${isUser ? 'conv-user' : 'conv-assistant'}">
+    <div class="conv-message-head">
+      <span class="conv-role">${isUser ? '用户' : '助手'}</span>
+      <time class="conv-time" datetime="${time.iso}">${time.full}</time>
+      ${meta.length ? `<span class="conv-meta">${meta.join(' · ')}</span>` : ''}
+    </div>
+    <div class="conv-parts">${parts}${errorHtml}</div>
+  </article>`;
+}
+
+function renderConversation(data, sessionId) {
+  const messages = Array.isArray(data.messages) ? data.messages : [];
+  const title = data.session && data.session.title ? data.session.title : '完整对话';
+  const meta = [sessionId, `${messages.length} 条消息`];
+  if (data.session && data.session.directory) meta.push(data.session.directory);
+
+  const titleEl = $('conversationTitle');
+  titleEl.textContent = title;
+  titleEl.title = title;
+  $('conversationMeta').textContent = meta.join(' · ');
+
+  const body = $('conversationBody');
+  const token = ++conversationRenderToken;
+  if (messages.length === 0) {
+    body.innerHTML = '<div class="empty-inline">这个会话还没有对话记录。</div>';
+    return;
+  }
+
+  body.innerHTML = '';
+  appendConversationBatch(body, messages, 0, token);
+}
+
+function appendConversationBatch(body, messages, start, token) {
+  if (token !== conversationRenderToken) return;
+
+  const batch = messages.slice(start, start + 40);
+  if (batch.length === 0) return;
+
+  body.insertAdjacentHTML('beforeend', batch.map(conversationMessageMarkup).join(''));
+
+  const next = start + batch.length;
+  if (next < messages.length) {
+    setTimeout(() => appendConversationBatch(body, messages, next, token), 0);
+  }
+}
+
+async function loadConversation(sessionId, dbId) {
+  const body = $('conversationBody');
+  try {
+    const db = dbId && dbId !== 'default' ? `?db=${encodeURIComponent(dbId)}` : '';
+    const data = await api(`/api/sessions/${encodeURIComponent(sessionId)}/conversation${db}`);
+    if (conversationSessionId !== sessionId || conversationDbId !== dbId) return;
+    renderConversation(data, sessionId);
+  } catch (error) {
+    if (conversationSessionId !== sessionId || conversationDbId !== dbId) return;
+    body.innerHTML = `<div class="inline-error">
+      ${icon('alert')}
+      <span>无法读取完整对话：${escapeHtml(error.message)}</span>
+      <button class="text-button" type="button" data-action="retry-conversation">重试</button>
+    </div>`;
+  }
+}
+
+function openConversation(index, trigger) {
+  const session = state.sessions[index];
+  if (!session) return;
+
+  conversationSessionId = session.id;
+  conversationDbId = sessionDbId(session);
+  conversationTrigger = trigger || null;
+  conversationRenderToken += 1;
+
+  const titleEl = $('conversationTitle');
+  titleEl.textContent = session.title || '完整对话';
+  titleEl.title = session.title || '完整对话';
+  $('conversationMeta').textContent = conversationDbId === 'default'
+    ? session.id
+    : `${session.id} · ${session.db_label || conversationDbId}`;
+  $('conversationBody').innerHTML = '<div class="loading-state"><span class="spinner" aria-hidden="true"></span><span>正在读取完整对话</span></div>';
+
+  $('conversationModal').hidden = false;
+  syncModalLock();
+  $('conversationClose').focus();
+  loadConversation(session.id, conversationDbId);
+}
+
+function closeConversation() {
+  const modal = $('conversationModal');
+  if (modal.hidden) return;
+
+  conversationSessionId = null;
+  conversationDbId = null;
+  conversationRenderToken += 1;
+  modal.hidden = true;
+  syncModalLock();
+  $('conversationBody').innerHTML = '';
+
+  if (conversationTrigger && document.contains(conversationTrigger)) {
+    conversationTrigger.focus();
+  }
+  conversationTrigger = null;
+}
+
+function trapModalFocus(event) {
+  const modal = !$('settingsModal').hidden
+    ? $('settingsModal')
+    : $('conversationModal');
+  const dialog = modal.querySelector('.conversation-dialog');
+  if (!dialog) return;
+  const focusable = Array.from(dialog.querySelectorAll(
+    'button, summary, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+  )).filter((element) => !element.disabled && element.offsetParent !== null);
+  if (focusable.length === 0) {
+    event.preventDefault();
+    return;
+  }
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+function syncModalLock() {
+  const anyOpen = !$('conversationModal').hidden || !$('settingsModal').hidden;
+  document.body.classList.toggle('has-modal', anyOpen);
+}
+
+// ─── Settings / database sources ─────────────────────────────
+function showSettingsHint(message, isError) {
+  const hint = $('settingsHint');
+  hint.textContent = message || '';
+  hint.classList.toggle('is-error', Boolean(isError));
+}
+
+async function postSettings(payload) {
+  const response = await fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+  settingsDatabases = Array.isArray(data.databases) ? data.databases : [];
+  renderSettings();
+  return data;
+}
+
+function renderSettings() {
+  const master = $('settingsAll');
+  const enabled = settingsDatabases.filter((db) => db.enabled).length;
+  master.checked = settingsDatabases.length > 0 && enabled === settingsDatabases.length;
+  master.indeterminate = enabled > 0 && enabled < settingsDatabases.length;
+
+  const list = $('dbList');
+  if (settingsDatabases.length === 0) {
+    list.innerHTML = '<li class="empty-inline">没有可用的数据库。</li>';
+    return;
+  }
+
+  list.innerHTML = settingsDatabases.map((db) => {
+    const missing = !db.exists;
+    const badge = db.builtin ? '<span class="db-badge">默认</span>' : '';
+    const missingBadge = missing ? '<span class="db-badge is-missing">文件不存在</span>' : '';
+    const remove = db.builtin
+      ? ''
+      : `<button class="mini-button" type="button" data-action="remove-db" data-db-id="${escapeHtml(db.id)}" title="移除数据库" aria-label="移除数据库">${icon('x')}</button>`;
+    return `<li class="db-item ${missing ? 'is-missing' : ''}" data-db-id="${escapeHtml(db.id)}">
+      <div class="db-main">
+        <div class="db-head">
+          <span class="db-label">${escapeHtml(db.label)}</span>
+          ${badge}${missingBadge}
+        </div>
+        <code class="db-path" title="${escapeHtml(db.path)}">${escapeHtml(db.path)}</code>
+      </div>
+      <div class="db-actions">
+        <button class="mini-button" type="button" data-action="download-db" data-db-id="${escapeHtml(db.id)}" title="下载此数据库" aria-label="下载此数据库" ${missing ? 'disabled' : ''}>${icon('download')}</button>
+        ${remove}
+        <label class="toggle-control" title="启用或停用此数据库">
+          <span class="switch">
+            <input type="checkbox" data-db-toggle="${escapeHtml(db.id)}" ${db.enabled ? 'checked' : ''} ${missing ? 'disabled' : ''}>
+            <span class="switch-track" aria-hidden="true"></span>
+          </span>
+        </label>
+      </div>
+    </li>`;
+  }).join('');
+}
+
+async function loadSettings() {
+  showSettingsHint('正在读取数据库列表…');
+  try {
+    const data = await api('/api/settings');
+    settingsDatabases = Array.isArray(data.databases) ? data.databases : [];
+    renderSettings();
+    showSettingsHint(settingsDatabases.length
+      ? `共 ${settingsDatabases.length} 个数据库来源`
+      : '没有可用的数据库');
+  } catch (error) {
+    showSettingsHint(`读取设置失败：${error.message}`, true);
+  }
+}
+
+function openSettings() {
+  $('settingsModal').hidden = false;
+  syncModalLock();
+  showSettingsHint('');
+  $('settingsClose').focus();
+  loadSettings();
+}
+
+function closeSettings() {
+  const modal = $('settingsModal');
+  if (modal.hidden) return;
+  modal.hidden = true;
+  syncModalLock();
+}
+
+async function setAllDatabases(enabled) {
+  try {
+    await postSettings({ action: 'set_all', enabled });
+    showSettingsHint(enabled ? '已启用全部数据库' : '已停用全部数据库');
+    await loadSessions();
+  } catch (error) {
+    showSettingsHint(error.message, true);
+    renderSettings();
+  }
+}
+
+async function toggleDatabase(dbId, enabled) {
+  try {
+    await postSettings({ action: 'set_enabled', id: dbId, enabled });
+    showSettingsHint(enabled ? '已启用数据库' : '已停用数据库');
+    await loadSessions();
+  } catch (error) {
+    showSettingsHint(error.message, true);
+    renderSettings();
+  }
+}
+
+async function addDatabase() {
+  const input = $('newDbPath');
+  const path = input.value.trim();
+  if (!path) {
+    showSettingsHint('请输入数据库文件路径', true);
+    return;
+  }
+  try {
+    await postSettings({ action: 'add', path });
+    input.value = '';
+    showSettingsHint('已添加数据库');
+    await loadSessions();
+  } catch (error) {
+    showSettingsHint(error.message, true);
+  }
+}
+
+async function removeDatabase(dbId) {
+  try {
+    await postSettings({ action: 'remove', id: dbId });
+    showSettingsHint('已移除数据库');
+    await loadSessions();
+  } catch (error) {
+    showSettingsHint(error.message, true);
+  }
+}
+
+function downloadDatabaseById(dbId) {
+  const suffix = dbId && dbId !== 'default' ? `?db=${encodeURIComponent(dbId)}` : '';
+  showToast('正在下载数据库文件…');
+  window.location.href = `/api/download-db${suffix}`;
 }
 
 function renderPagination() {
@@ -2093,11 +3062,13 @@ async function loadSessionMessages(index) {
   if (!session || !container) return;
 
   container.innerHTML = inlineLoadingMarkup();
+  const key = sessionKey(session);
+  const db = encodeURIComponent(sessionDbId(session));
 
   try {
-    const data = await api(`/api/sessions/${encodeURIComponent(session.id)}/messages?limit=10`);
-    state.sessionMessages[session.id] = Array.isArray(data.messages) ? data.messages : [];
-    renderMessages(index, state.sessionMessages[session.id]);
+    const data = await api(`/api/sessions/${encodeURIComponent(session.id)}/messages?limit=10&db=${db}`);
+    state.sessionMessages[key] = Array.isArray(data.messages) ? data.messages : [];
+    renderMessages(index, state.sessionMessages[key]);
   } catch (error) {
     container.innerHTML = `<div class="inline-error">
       ${icon('alert')}
@@ -2115,10 +3086,11 @@ async function toggleSession(index) {
   const detail = $(`detail-${index}`);
   const chevron = card.querySelector('[data-action="toggle"]');
   const title = session.title || '未命名会话';
-  const isOpen = state.expandedSessions.has(session.id);
+  const key = sessionKey(session);
+  const isOpen = state.expandedSessions.has(key);
 
   if (isOpen) {
-    state.expandedSessions.delete(session.id);
+    state.expandedSessions.delete(key);
     card.classList.remove('is-open');
     detail.setAttribute('aria-hidden', 'true');
     detail.inert = true;
@@ -2127,21 +3099,21 @@ async function toggleSession(index) {
     return;
   }
 
-  if (state.pendingSessions.has(session.id)) return;
+  if (state.pendingSessions.has(key)) return;
 
-  state.expandedSessions.add(session.id);
+  state.expandedSessions.add(key);
   chevron.setAttribute('aria-expanded', 'true');
   chevron.setAttribute('aria-label', `收起会话：${title}`);
 
-  if (state.sessionMessages[session.id]) {
-    renderMessages(index, state.sessionMessages[session.id]);
+  if (state.sessionMessages[key]) {
+    renderMessages(index, state.sessionMessages[key]);
   } else {
-    state.pendingSessions.add(session.id);
+    state.pendingSessions.add(key);
     await loadSessionMessages(index);
-    state.pendingSessions.delete(session.id);
+    state.pendingSessions.delete(key);
   }
 
-  if (!state.expandedSessions.has(session.id)) return;
+  if (!state.expandedSessions.has(key)) return;
 
   detail.inert = false;
   detail.setAttribute('aria-hidden', 'false');
@@ -2161,6 +3133,7 @@ function handleListClick(event) {
     if (action === 'export') exportSession(index, actionTarget);
     if (action === 'fork') forkSessionFromMessage(index, actionTarget.dataset.messageId, actionTarget);
     if (action === 'retry-messages') loadSessionMessages(index);
+    if (action === 'show-conversation') openConversation(index, actionTarget);
     if (action === 'clear-search') clearSearch();
     return;
   }
@@ -2188,6 +3161,29 @@ function changeSort() {
   state.sort = $('sortOrder').value;
   state.page = 1;
   loadSessions();
+}
+
+function syncSearchContentUI() {
+  $('searchInput').placeholder = state.searchContent
+    ? '搜索会话 ID、标题或内容'
+    : '搜索会话 ID 或标题';
+}
+
+function toggleSearchContent() {
+  state.searchContent = $('searchContent').checked;
+  syncSearchContentUI();
+  state.page = 1;
+  loadSessions();
+}
+
+function toggleShowChildren() {
+  state.showChildren = $('showChildren').checked;
+  state.page = 1;
+  loadSessions();
+}
+
+function downloadDatabase() {
+  downloadDatabaseById('default');
 }
 
 function updateClearButton() {
@@ -2222,11 +3218,55 @@ function refreshSessions() {
 $('themeToggle').addEventListener('click', toggleTheme);
 $('searchInput').addEventListener('input', onSearchInput);
 $('clearSearch').addEventListener('click', clearSearch);
+$('searchContent').addEventListener('change', toggleSearchContent);
+$('showChildren').addEventListener('change', toggleShowChildren);
 $('sortOrder').addEventListener('change', changeSort);
 $('pageSize').addEventListener('change', changePageSize);
 $('refreshBtn').addEventListener('click', refreshSessions);
+$('downloadDb').addEventListener('click', downloadDatabase);
+$('settingsBtn').addEventListener('click', openSettings);
+$('settingsClose').addEventListener('click', closeSettings);
+$('addDbBtn').addEventListener('click', addDatabase);
+$('settingsAll').addEventListener('change', () => setAllDatabases($('settingsAll').checked));
+
+$('newDbPath').addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter') return;
+  event.preventDefault();
+  addDatabase();
+});
+
+$('dbList').addEventListener('change', (event) => {
+  const toggle = event.target.closest('[data-db-toggle]');
+  if (!toggle) return;
+  toggleDatabase(toggle.dataset.dbToggle, toggle.checked);
+});
+
+$('dbList').addEventListener('click', (event) => {
+  const target = event.target.closest('[data-action]');
+  if (!target) return;
+  if (target.dataset.action === 'download-db') downloadDatabaseById(target.dataset.dbId);
+  if (target.dataset.action === 'remove-db') removeDatabase(target.dataset.dbId);
+});
+
 $('retryBtn').addEventListener('click', loadSessions);
 $('sessionList').addEventListener('click', handleListClick);
+$('conversationClose').addEventListener('click', closeConversation);
+
+$('conversationModal').addEventListener('click', (event) => {
+  const target = event.target.closest('[data-action]');
+  if (!target) return;
+  if (target.dataset.action === 'close-conversation') {
+    closeConversation();
+  } else if (target.dataset.action === 'retry-conversation' && conversationSessionId) {
+    $('conversationBody').innerHTML = '<div class="loading-state"><span class="spinner" aria-hidden="true"></span><span>正在读取完整对话</span></div>';
+    loadConversation(conversationSessionId, conversationDbId);
+  }
+});
+
+$('settingsModal').addEventListener('click', (event) => {
+  const target = event.target.closest('[data-action]');
+  if (target && target.dataset.action === 'close-settings') closeSettings();
+});
 
 $('pagination').addEventListener('click', (event) => {
   const button = event.target.closest('[data-page]');
@@ -2236,6 +3276,22 @@ $('pagination').addEventListener('click', (event) => {
 
 document.addEventListener('keydown', (event) => {
   if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+
+  const conversationOpen = !$('conversationModal').hidden;
+  const settingsOpen = !$('settingsModal').hidden;
+  if (conversationOpen || settingsOpen) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      if (settingsOpen) closeSettings();
+      else closeConversation();
+      return;
+    }
+    if (event.key === 'Tab') {
+      trapModalFocus(event);
+      return;
+    }
+  }
+
   if (event.target.closest('input, select, textarea, [contenteditable="true"]')) return;
 
   if (event.key === 'ArrowLeft') {
@@ -2252,6 +3308,7 @@ document.addEventListener('keydown', (event) => {
 
 // ─── Init ────────────────────────────────────────────────────
 syncThemeControl();
+syncSearchContentUI();
 updateClearButton();
 loadSessions();
 </script>

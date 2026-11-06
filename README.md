@@ -5,7 +5,11 @@
 ## 功能
 
 - 📋 按创建时间浏览所有 session（分页 10 / 20 / 50）
-- 💬 展开查看每个 session 最近 10 次用户输入
+- 🔍 默认按会话 ID / 标题搜索，可开启「搜索内容」同步搜索会话正文
+- 💬 展开查看每个 session 最近 10 次用户输入，并可打开完整对话记录
+- 🧵 子会话（subagent）默认隐藏，可按需显示
+- 🗃️ 支持配置多个数据库来源（默认库 + 自定义库），可统一或单独启用
+- 💾 一键下载数据库文件（默认库或设置中的任意库）
 - 🔀 按用户输入一键 fork，包含该输入及之前的完整上下文
 - 🖥️ 一键在 opencode 终端中打开指定会话（需安装 opencode CLI）
 - 💰 展示 token 用量、成本、agent、model 等元信息
@@ -32,6 +36,17 @@ python server.py --port 8765 --db "C:\path\to\opencode.db"
 默认读取 `%USERPROFILE%\.local\share\opencode\opencode.db`。
 
 可通过环境变量 `OPENCODE_DB` 覆盖。
+
+## 多数据库设置
+
+点击页面右上角的设置按钮，可以：
+
+- 查看默认数据库路径
+- 添加多个自定义 `.db` 文件路径
+- 统一启用/停用全部数据库，或单独开关每个数据库
+- 单独下载任意数据库文件
+
+设置保存在 `%USERPROFILE%\.local\share\opencode\session-viewer.json`，可通过环境变量 `OPENCODE_VIEWER_SETTINGS` 指定其他位置。
 
 ## 技术栈
 

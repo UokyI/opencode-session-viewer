@@ -5,6 +5,7 @@ Usage: python server.py [--port PORT] [--db PATH]
 """
 import sqlite3
 import json
+import hashlib
 import os
 import sys
 import shutil
@@ -41,15 +42,199 @@ while i < len(args):
     else:
         i += 1
 
+SETTINGS_PATH = os.environ.get(
+    "OPENCODE_VIEWER_SETTINGS",
+    os.path.join(
+        os.path.expanduser("~"), ".local", "share", "opencode",
+        "session-viewer.json",
+    ),
+)
+
 # ─── Database helper ─────────────────────────────────────────
-def get_db():
+def get_db(path=None):
     """Get a new SQLite connection with row factory."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(path or DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.execute("PRAGMA busy_timeout=5000")
     return conn
+
+
+# ─── Database sources / settings ─────────────────────────────
+settings_lock = threading.Lock()
+
+
+def _db_id(path):
+    digest = hashlib.sha1(
+        os.path.normcase(os.path.abspath(path)).encode("utf-8")
+    ).hexdigest()
+    return f"db_{digest[:12]}"
+
+
+def load_settings():
+    try:
+        with open(SETTINGS_PATH, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError):
+        data = {}
+
+    custom = []
+    if isinstance(data, dict):
+        for item in data.get("custom", []):
+            if not isinstance(item, dict):
+                continue
+            path = item.get("path")
+            if not isinstance(path, str) or not path.strip():
+                continue
+            custom.append({
+                "id": item.get("id") or _db_id(path),
+                "path": path,
+                "enabled": bool(item.get("enabled", True)),
+            })
+
+    return {
+        "default_enabled": bool(data.get("default_enabled", True))
+        if isinstance(data, dict) else True,
+        "custom": custom,
+    }
+
+
+def save_settings(settings):
+    directory = os.path.dirname(SETTINGS_PATH)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    with open(SETTINGS_PATH, "w", encoding="utf-8") as handle:
+        json.dump(settings, handle, ensure_ascii=False, indent=2)
+
+
+def get_databases():
+    settings = load_settings()
+    databases = [{
+        "id": "default",
+        "label": "默认数据库",
+        "path": DB_PATH,
+        "enabled": settings["default_enabled"],
+        "builtin": True,
+        "exists": os.path.isfile(DB_PATH),
+    }]
+
+    seen = {os.path.normcase(os.path.abspath(DB_PATH))}
+    for item in settings["custom"]:
+        key = os.path.normcase(os.path.abspath(item["path"]))
+        if key in seen:
+            continue
+        seen.add(key)
+        databases.append({
+            "id": item["id"],
+            "label": "自定义数据库",
+            "path": item["path"],
+            "enabled": item["enabled"],
+            "builtin": False,
+            "exists": os.path.isfile(item["path"]),
+        })
+
+    return databases
+
+
+def get_enabled_databases():
+    return [
+        database for database in get_databases()
+        if database["enabled"] and database["exists"]
+    ]
+
+
+def resolve_db_path(db_id):
+    if not db_id or db_id == "default":
+        return DB_PATH
+    for database in get_databases():
+        if database["id"] == db_id:
+            return database["path"]
+    return None
+
+
+def is_opencode_db(path):
+    if not os.path.isfile(path):
+        return False
+    try:
+        conn = sqlite3.connect(path, timeout=2)
+        try:
+            row = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='session'"
+            ).fetchone()
+            return row is not None
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return False
+
+
+def update_settings(payload):
+    action = payload.get("action")
+
+    with settings_lock:
+        settings = load_settings()
+
+        if action == "set_all":
+            enabled = bool(payload.get("enabled"))
+            settings["default_enabled"] = enabled
+            for item in settings["custom"]:
+                item["enabled"] = enabled
+
+        elif action == "set_enabled":
+            db_id = payload.get("id")
+            enabled = bool(payload.get("enabled"))
+            if db_id == "default":
+                settings["default_enabled"] = enabled
+            else:
+                for item in settings["custom"]:
+                    if item["id"] == db_id:
+                        item["enabled"] = enabled
+                        break
+                else:
+                    return {"error": "数据库不存在"}
+
+        elif action == "add":
+            raw = str(payload.get("path") or "").strip().strip('"').strip("'")
+            if not raw:
+                return {"error": "请填写数据库路径"}
+            path = os.path.abspath(os.path.expanduser(raw))
+            if not os.path.isfile(path):
+                return {"error": "文件不存在"}
+            if not is_opencode_db(path):
+                return {"error": "不是有效的 OpenCode 数据库"}
+
+            existing = {os.path.normcase(os.path.abspath(DB_PATH))}
+            existing |= {
+                os.path.normcase(os.path.abspath(item["path"]))
+                for item in settings["custom"]
+            }
+            if os.path.normcase(path) in existing:
+                return {"error": "该数据库已存在"}
+
+            settings["custom"].append({
+                "id": _db_id(path),
+                "path": path,
+                "enabled": True,
+            })
+
+        elif action == "remove":
+            db_id = payload.get("id")
+            if db_id == "default":
+                return {"error": "默认数据库不能删除"}
+            before = len(settings["custom"])
+            settings["custom"] = [
+                item for item in settings["custom"] if item["id"] != db_id
+            ]
+            if len(settings["custom"]) == before:
+                return {"error": "数据库不存在"}
+
+        else:
+            return {"error": "未知操作"}
+
+        save_settings(settings)
+
+    return {"databases": get_databases()}
 
 def open_directory(path):
     """Open a folder in the platform file manager."""
@@ -229,12 +414,52 @@ def _launch_terminal(command, session_id, directory, env):
 
 
 # ─── API Handlers ─────────────────────────────────────────────
+def _like_pattern(value):
+    """Build a contains-pattern with LIKE wildcards escaped."""
+    escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
+def _flag(params, name):
+    return params.get(name, ["0"])[0].lower() in ("1", "true", "on", "yes")
+
+
+def _session_dict(row, database):
+    return {
+        "id": row["id"],
+        "title": row["title"],
+        "directory": row["directory"],
+        "path": row["path"],
+        "agent": row["agent"],
+        "model": json.loads(row["model"]) if row["model"] else None,
+        "cost": row["cost"],
+        "tokens_input": row["tokens_input"],
+        "tokens_output": row["tokens_output"],
+        "tokens_reasoning": row["tokens_reasoning"],
+        "tokens_cache_read": row["tokens_cache_read"],
+        "tokens_cache_write": row["tokens_cache_write"],
+        "summary_additions": row["summary_additions"],
+        "summary_deletions": row["summary_deletions"],
+        "summary_files": row["summary_files"],
+        "version": row["version"],
+        "time_created": row["time_created"],
+        "time_updated": row["time_updated"],
+        "time_archived": row["time_archived"],
+        "message_count": row["message_count"],
+        "user_message_count": row["user_message_count"],
+        "db": database["id"],
+        "db_label": database["label"],
+    }
+
+
 def api_sessions(params):
-    """GET /api/sessions?page=1&limit=10&sort=desc&q=search"""
+    """GET /api/sessions?page=1&limit=10&sort=desc&q=search&content=1&children=1"""
     page = int(params.get("page", [1])[0])
     limit = int(params.get("limit", [10])[0])
     sort = params.get("sort", ["desc"])[0]
     query = params.get("q", [""])[0].strip()
+    search_content = _flag(params, "content")
+    include_children = _flag(params, "children")
     limit = min(max(limit, 1), 100)  # clamp 1-100
     offset = (page - 1) * limit
 
@@ -247,67 +472,89 @@ def api_sessions(params):
     }
     order_clause = sort_map.get(sort, "s.time_created DESC")
 
-    conn = get_db()
-    try:
-        # Build WHERE clause for search
-        where_clause = ""
-        where_params = []
-        if query:
-            where_clause = "WHERE s.id LIKE ? OR s.title LIKE ?"
-            like_q = f"%{query}%"
-            where_params = [like_q, like_q]
+    # Build WHERE clause for search
+    clauses = []
+    where_params = []
+    if query:
+        like_q = _like_pattern(query)
+        search_parts = [
+            "s.id LIKE ? ESCAPE '\\'",
+            "s.title LIKE ? ESCAPE '\\'",
+        ]
+        where_params.extend([like_q, like_q])
 
-        # Total count (filtered)
-        total = conn.execute(
-            f"SELECT COUNT(*) FROM session s {where_clause}", where_params
-        ).fetchone()[0]
+        if search_content:
+            search_parts.append("""s.id IN (
+                SELECT p.session_id FROM part p
+                WHERE COALESCE(json_extract(p.data, '$.text'), '') LIKE ? ESCAPE '\\'
+                   OR COALESCE(json_extract(p.data, '$.state.input'), '') LIKE ? ESCAPE '\\'
+                   OR COALESCE(json_extract(p.data, '$.state.output'), '') LIKE ? ESCAPE '\\'
+                   OR COALESCE(json_extract(p.data, '$.filename'), '') LIKE ? ESCAPE '\\'
+                   OR COALESCE(json_extract(p.data, '$.files'), '') LIKE ? ESCAPE '\\'
+            )""")
+            where_params.extend([like_q] * 5)
+            search_parts.append("""s.id IN (
+                SELECT sm.session_id FROM session_message sm
+                WHERE COALESCE(json_extract(sm.data, '$.text'), '') LIKE ? ESCAPE '\\'
+            )""")
+            where_params.append(like_q)
 
-        # Sessions with message counts
-        rows = conn.execute(f"""
-            SELECT s.*,
-                   (SELECT COUNT(*) FROM message m WHERE m.session_id = s.id) as message_count,
-                   (SELECT COUNT(*) FROM message m WHERE m.session_id = s.id AND json_extract(m.data, '$.role')='user') as user_message_count
-            FROM session s
-            {where_clause}
-            ORDER BY {order_clause}
-            LIMIT ? OFFSET ?
-        """, where_params + [limit, offset]).fetchall()
+        clauses.append("(" + " OR ".join(search_parts) + ")")
 
-        sessions = []
-        for r in rows:
-            sessions.append({
-                "id": r["id"],
-                "title": r["title"],
-                "directory": r["directory"],
-                "path": r["path"],
-                "agent": r["agent"],
-                "model": json.loads(r["model"]) if r["model"] else None,
-                "cost": r["cost"],
-                "tokens_input": r["tokens_input"],
-                "tokens_output": r["tokens_output"],
-                "tokens_reasoning": r["tokens_reasoning"],
-                "tokens_cache_read": r["tokens_cache_read"],
-                "tokens_cache_write": r["tokens_cache_write"],
-                "summary_additions": r["summary_additions"],
-                "summary_deletions": r["summary_deletions"],
-                "summary_files": r["summary_files"],
-                "version": r["version"],
-                "time_created": r["time_created"],
-                "time_updated": r["time_updated"],
-                "time_archived": r["time_archived"],
-                "message_count": r["message_count"],
-                "user_message_count": r["user_message_count"],
-            })
+    if not include_children:
+        clauses.append("(s.parent_id IS NULL OR s.parent_id = '')")
 
-        return {
-            "sessions": sessions,
-            "total": total,
-            "page": page,
-            "limit": limit,
-            "total_pages": max(1, (total + limit - 1) // limit),
-        }
-    finally:
-        conn.close()
+    where_clause = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+
+    sessions = []
+    for database in get_enabled_databases():
+        try:
+            conn = get_db(database["path"])
+        except sqlite3.Error:
+            continue
+        try:
+            rows = conn.execute(f"""
+                SELECT s.*,
+                       (SELECT COUNT(*) FROM message m WHERE m.session_id = s.id) as message_count,
+                       (SELECT COUNT(*) FROM message m WHERE m.session_id = s.id AND json_extract(m.data, '$.role')='user') as user_message_count
+                FROM session s
+                {where_clause}
+                ORDER BY {order_clause}
+            """, where_params).fetchall()
+        except sqlite3.Error:
+            rows = []
+        finally:
+            conn.close()
+
+        for row in rows:
+            try:
+                sessions.append(_session_dict(row, database))
+            except (KeyError, TypeError, ValueError):
+                continue
+
+    if sort == "asc":
+        sessions.sort(key=lambda s: s["time_created"] or 0)
+    elif sort == "user_msg_desc":
+        sessions.sort(key=lambda s: (
+            -(s["user_message_count"] or 0), -(s["time_created"] or 0)
+        ))
+    elif sort == "user_msg_asc":
+        sessions.sort(key=lambda s: (
+            s["user_message_count"] or 0, -(s["time_created"] or 0)
+        ))
+    else:
+        sessions.sort(key=lambda s: -(s["time_created"] or 0))
+
+    total = len(sessions)
+    page_sessions = sessions[offset:offset + limit]
+
+    return {
+        "sessions": page_sessions,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "total_pages": max(1, (total + limit - 1) // limit),
+    }
 
 def api_session_messages(params):
     """GET /api/sessions/:id/messages?limit=10"""
@@ -410,6 +657,17 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_file(self, path, filename, content_type="application/octet-stream"):
+        size = os.path.getsize(path)
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        self.send_header("Content-Length", str(size))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        with open(path, "rb") as handle:
+            shutil.copyfileobj(handle, self.wfile)
+
     def _send_error(self, status, message):
         self._send_json({"error": message}, status)
 
@@ -458,9 +716,22 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self._send_json(api_sessions(params))
                 return
 
+            if path == "/api/settings":
+                self._send_json({"databases": get_databases()})
+                return
+
+            if path == "/api/download-db":
+                api_download_db(self, params)
+                return
+
             if path.startswith("/api/sessions/") and path.endswith("/export"):
                 session_id = path.split("/")[3]  # /api/sessions/{id}/export
                 api_export_session(self, session_id)
+                return
+
+            if path.startswith("/api/sessions/") and path.endswith("/conversation"):
+                session_id = path.split("/")[3]  # /api/sessions/{id}/conversation
+                self._send_json(api_session_conversation(session_id, params))
                 return
 
             if path.startswith("/api/sessions/") and path.endswith("/messages"):
@@ -490,12 +761,24 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         is_fork = path.startswith("/api/sessions/") and path.endswith("/fork")
         is_open = path.startswith("/api/sessions/") and path.endswith("/open")
-        if path != "/api/open-folder" and not is_fork and not is_open:
+        is_settings = path == "/api/settings"
+        if path != "/api/open-folder" and not is_fork and not is_open and not is_settings:
             self._send_error(404, "Not Found")
             return
 
         if not self._is_local_request():
             self._send_error(403, "此操作仅限本机访问")
+            return
+
+        if is_settings:
+            payload = self._read_json_body()
+            if payload is None:
+                return
+            result = update_settings(payload)
+            if "error" in result:
+                self._send_error(400, result["error"])
+            else:
+                self._send_json(result)
             return
 
         if is_fork or is_open:
@@ -556,6 +839,32 @@ class ViewerHTTPServer(ThreadingHTTPServer):
             # so stale instances keep answering requests on the old code.
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
         super().server_bind()
+
+
+def api_download_db(handler, params):
+    """GET /api/download-db?db=<id> — download a database file."""
+    db_id = params.get("db", ["default"])[0]
+    db_path = resolve_db_path(db_id)
+    if not db_path or not os.path.isfile(db_path):
+        handler._send_error(404, "数据库不存在")
+        return
+
+    try:
+        conn = get_db(db_path)
+        try:
+            # Fold pending WAL pages into the main file so the download is complete.
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        finally:
+            conn.close()
+
+        stem = os.path.splitext(os.path.basename(db_path))[0] or "opencode"
+        stem = "".join(
+            ch for ch in stem if ch.isascii() and (ch.isalnum() or ch in "-_")
+        ) or "opencode"
+        filename = f"{stem}-{time.strftime('%Y%m%d-%H%M%S')}.db"
+        handler._send_file(db_path, filename, "application/vnd.sqlite3")
+    except Exception as e:
+        handler._send_error(500, f"下载数据库失败: {e}")
 
 
 def api_export_session(handler, session_id):
@@ -736,8 +1045,11 @@ def api_session_messages_by_id(session_id, params):
     """Handle /api/sessions/{id}/messages"""
     limit = int(params.get("limit", [10])[0])
     limit = min(max(limit, 1), 50)
+    db_path = resolve_db_path(params.get("db", ["default"])[0])
+    if not db_path or not os.path.isfile(db_path):
+        return {"messages": [], "error": "数据库不存在"}
 
-    conn = get_db()
+    conn = get_db(db_path)
     try:
         msg_map = {}
 
@@ -775,12 +1087,15 @@ def api_session_messages_by_id(session_id, params):
                     msg_map[mid]["texts"].append(f"[File: {fname}]")
 
         # New session_message table
-        sm_rows = conn.execute("""
-            SELECT * FROM session_message
-            WHERE session_id = ? AND type = 'user'
-            ORDER BY time_created DESC
-            LIMIT ?
-        """, (session_id, limit)).fetchall()
+        try:
+            sm_rows = conn.execute("""
+                SELECT * FROM session_message
+                WHERE session_id = ? AND type = 'user'
+                ORDER BY time_created DESC
+                LIMIT ?
+            """, (session_id, limit)).fetchall()
+        except sqlite3.OperationalError:
+            sm_rows = []
 
         for sm in sm_rows:
             sm_data = json.loads(sm["data"])
@@ -799,6 +1114,179 @@ def api_session_messages_by_id(session_id, params):
             del m["texts"]
 
         return {"messages": messages}
+    finally:
+        conn.close()
+
+
+def _clip_text(value, limit=6000):
+    """Render a part field as readable text, truncating very large payloads."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        text = value
+    else:
+        try:
+            text = json.dumps(value, ensure_ascii=False, indent=2)
+        except (TypeError, ValueError):
+            text = str(value)
+    if len(text) > limit:
+        return text[:limit] + f"\n…（已截断，共 {len(text)} 字符）"
+    return text
+
+
+def _conversation_part(part_data):
+    """Shape a part JSON blob into the fields the conversation modal renders."""
+    ptype = part_data.get("type")
+
+    if ptype in ("text", "reasoning"):
+        text = part_data.get("text") or ""
+        if not text.strip():
+            return None
+        return {"type": ptype, "text": text}
+
+    if ptype == "tool":
+        state = part_data.get("state") or {}
+        output = state.get("output")
+        if output is None and state.get("status") == "error":
+            output = state.get("error")
+        return {
+            "type": "tool",
+            "tool": part_data.get("tool") or "tool",
+            "status": state.get("status") or "unknown",
+            "title": state.get("title"),
+            "input": _clip_text(state.get("input")),
+            "output": _clip_text(output),
+        }
+
+    if ptype == "file":
+        return {
+            "type": "file",
+            "filename": part_data.get("filename") or "文件",
+            "mime": part_data.get("mime"),
+        }
+
+    if ptype == "patch":
+        return {
+            "type": "patch",
+            "files": part_data.get("files") or [],
+            "hash": part_data.get("hash"),
+        }
+
+    return None
+
+
+def _message_error_text(error):
+    if not error:
+        return None
+    if isinstance(error, str):
+        return error
+    if isinstance(error, dict):
+        data = error.get("data")
+        if isinstance(data, dict) and data.get("message"):
+            return data["message"]
+        return error.get("name") or "发生错误"
+    return str(error)
+
+
+def api_session_conversation(session_id, params):
+    """GET /api/sessions/{id}/conversation — full ordered conversation record."""
+    db_path = resolve_db_path(params.get("db", ["default"])[0])
+    if not db_path or not os.path.isfile(db_path):
+        return {"error": "数据库不存在"}
+
+    conn = get_db(db_path)
+    try:
+        srow = conn.execute(
+            "SELECT * FROM session WHERE id = ?", (session_id,)
+        ).fetchone()
+        if not srow:
+            return {"error": "会话不存在"}
+
+        rows = conn.execute("""
+            SELECT m.id AS message_id, m.time_created AS message_time,
+                   m.data AS message_data,
+                   p.id AS part_id, p.time_created AS part_time,
+                   p.data AS part_data
+            FROM message m
+            LEFT JOIN part p ON p.message_id = m.id
+            WHERE m.session_id = ?
+            ORDER BY m.time_created ASC, p.time_created ASC, p.id ASC
+        """, (session_id,)).fetchall()
+
+        messages = []
+        by_id = {}
+        for r in rows:
+            mid = r["message_id"]
+            if mid not in by_id:
+                mdata = json.loads(r["message_data"]) if r["message_data"] else {}
+                entry = {
+                    "id": mid,
+                    "role": mdata.get("role") or "assistant",
+                    "agent": mdata.get("agent"),
+                    "model": mdata.get("modelID"),
+                    "time_created": r["message_time"],
+                    "cost": mdata.get("cost"),
+                    "tokens": mdata.get("tokens"),
+                    "error": _message_error_text(mdata.get("error")),
+                    "parts": [],
+                }
+                by_id[mid] = entry
+                messages.append(entry)
+            if r["part_data"]:
+                try:
+                    part = _conversation_part(json.loads(r["part_data"]))
+                except (TypeError, ValueError):
+                    part = None
+                if part:
+                    by_id[mid]["parts"].append(part)
+
+        # Newer session_message store; skip ids already covered by legacy rows.
+        try:
+            sm_rows = conn.execute("""
+                SELECT * FROM session_message
+                WHERE session_id = ?
+                ORDER BY seq ASC, time_created ASC
+            """, (session_id,)).fetchall()
+        except sqlite3.OperationalError:
+            sm_rows = []
+
+        for sm in sm_rows:
+            if sm["id"] in by_id:
+                continue
+            try:
+                sm_data = json.loads(sm["data"]) if sm["data"] else {}
+            except (TypeError, ValueError):
+                sm_data = {}
+            text = sm_data.get("text")
+            role = sm["type"] if sm["type"] in ("user", "assistant") else "assistant"
+            entry = {
+                "id": sm["id"],
+                "role": role,
+                "agent": None,
+                "model": None,
+                "time_created": sm["time_created"],
+                "cost": None,
+                "tokens": None,
+                "error": None,
+                "parts": [{"type": "text", "text": text}] if text else [],
+            }
+            by_id[sm["id"]] = entry
+            messages.append(entry)
+
+        messages.sort(key=lambda m: m["time_created"] or 0)
+        messages = [m for m in messages if m["parts"] or m["error"]]
+
+        session_meta = {
+            "id": srow["id"],
+            "title": srow["title"],
+            "directory": srow["directory"],
+            "agent": srow["agent"],
+            "model": json.loads(srow["model"]) if srow["model"] else None,
+            "time_created": srow["time_created"],
+            "time_updated": srow["time_updated"],
+        }
+
+        return {"session": session_meta, "messages": messages}
     finally:
         conn.close()
 
